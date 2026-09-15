@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- Contour_Maker project ----
+.conda/
+.cache/
+logs/
+weights/
+data/raw/
+data/interim/
+data/unified/
+data/cache/
+data/yolo/
+data/yolo_subset/
+runs/
+*.pt

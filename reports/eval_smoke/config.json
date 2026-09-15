@@ -1,0 +1,15 @@
+{
+  "refiner": "runs/refiner_smoke_busi/best.pt",
+  "det": null,
+  "seg": null,
+  "split": "test",
+  "datasets": [
+    "busi"
+  ],
+  "conf": 0.25,
+  "imgsz": 640,
+  "out": "reports/eval_smoke",
+  "device": "cpu",
+  "max_images": 30,
+  "save_vis": 3
+}

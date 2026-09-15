@@ -1,0 +1,14 @@
+{
+  "refiner": "runs/refiner_v3_A5_busi-ddti-tn3k/best.pt",
+  "det": "runs/det_yolo26n_sub/weights/best.pt",
+  "seg": "runs/seg_yolo26n_sub/weights/best.pt",
+  "split": "test",
+  "datasets": null,
+  "conf": 0.25,
+  "imgsz": 512,
+  "out": "reports/v3_eval_A5",
+  "device": "cuda",
+  "max_images": null,
+  "uids_file": "data/yolo_subset/_subset_splits.csv",
+  "save_vis": 12
+}

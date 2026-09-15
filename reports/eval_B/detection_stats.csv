@@ -1,0 +1,2 @@
+method,n_gt,n_pred,n_miss,n_fp
+yolo26n_seg,341,376,41.0,76.0

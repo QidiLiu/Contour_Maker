@@ -1,0 +1,15 @@
+# Core experiment dependencies for Contour_Maker
+# Python 3.11 (conda env at ./.conda)
+# NOTE: torch/torchvision are installed separately with the cu128 index URL.
+
+numpy>=1.26,<2.2
+opencv-python-headless>=4.9
+scipy>=1.11
+scikit-image>=0.22
+Pillow>=10.0
+pandas>=2.1
+matplotlib>=3.8
+tqdm>=4.66
+PyYAML>=6.0
+albumentations>=1.4
+ultralytics>=8.4.0
