@@ -1,0 +1,14 @@
+{
+  "refiner": "runs/refiner_v3_A5_busi-ddti-tn3k/best.pt",
+  "det": null,
+  "seg": "runs/seg_yolo26n_sub/weights/best.pt",
+  "split": "test",
+  "datasets": null,
+  "conf": 0.25,
+  "imgsz": 512,
+  "out": "reports/tg3k_boundary",
+  "device": "cuda",
+  "max_images": null,
+  "uids_file": "data/splits/tg3k_test150.csv",
+  "save_vis": 6
+}

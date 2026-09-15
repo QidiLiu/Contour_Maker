@@ -1,0 +1,5 @@
+method,n_gt,n_pred,n_miss,n_fp
+refiner_gtbox,159,159,134.0,134.0
+rough_otsu,76,79,76.0,79.0
+rough_otsu_gtbox,159,159,143.0,143.0
+yolo26n_seg,159,79,159.0,79.0

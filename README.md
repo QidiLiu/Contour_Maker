@@ -24,6 +24,10 @@
 换成 GT 框后方案 A 追平方案 B。详见 [`reports/REPORT.md`](reports/REPORT.md) 与
 [`EXPERIMENT.md`](EXPERIMENT.md)。
 
+**边界案例（TG3K 甲状腺腺体，高回声）**：Otsu 的"低回声"假设失效，粗糙轮廓 Dice 仅 0.12
+（改用 `polarity=bright` 可到 0.43）；方案 B 在未训练过的该类别上同样输出空 mask。
+说明方案 A 适用于**目标为相对周围组织的低回声区**这一前提。
+
 ## contour-refiner 设计（严格按给定规格）
 
 * 每个目标取 `P = 64` 个粗糙轮廓点（等弧长、逆时针、首尾相接）。
