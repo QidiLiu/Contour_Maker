@@ -470,6 +470,71 @@ def main() -> int:
     A("**因此最终配置保持为**：`box_init_prob=0.25`、`bbox_jitter=0.10`、A1–A5、"
       "`box_aug=False`，即主结果表中的 A-box（0.8028 Dice / 14.33px HD95）。")
     A("")
+    A("## 4.7 输入尺寸对比：512×512 vs 256×256（A-box / B / EdgeSAM）")
+    A("")
+    A("三种方案在**同一检测器**（YOLO26n）下, 分别以 512×512 与 256×256 作为推理输入尺寸"
+      "（`imgsz`, letterbox 预处理），测试集前 120 张（busi/ddti/tn3k），"
+      "分割指标在原图分辨率下评估以保证与主结果同口径。")
+    A("")
+    isd = OUT / "input_size" / "accuracy_speed.csv"
+    if isd.exists():
+        a = pd.read_csv(isd)
+        spd = pd.read_csv(OUT / "input_size" / "speed.csv")
+        a = a.drop(columns=[c for c in ("end2end_ms_mean", "end2end_ms_median",
+                                        "end2end_ms_std", "fps") if c in a.columns])
+        a = a.merge(spd[["size", "method", "end2end_ms_mean", "end2end_ms_median",
+                         "end2end_ms_std", "fps"]], on=["size", "method"], how="left")
+        nm = {"A_box": "A-box (框+refiner)", "B_seg": "B (YOLO26n-seg)",
+              "SAM_edgesam": "YOLO26n+EdgeSAM"}
+        a["name"] = a["method"].map(nm)
+        A("### 4.7.1 检测性能（三方案共用同一检测器）")
+        A("")
+        A("| 输入尺寸 | TP | FP | FN | Precision | Recall | F1 |")
+        A("|---|---|---|---|---|---|---|")
+        for _, r in a.drop_duplicates("size").sort_values("size", ascending=False).iterrows():
+            A(f"| {int(r['size'])}×{int(r['size'])} | {int(r['det_tp'])} | {int(r['det_fp'])} | "
+              f"{int(r['det_fn'])} | {r['det_precision']:.4f} | {r['det_recall']:.4f} | "
+              f"**{r['det_f1']:.4f}** |")
+        A("")
+        A("**降到 256 时检测精度升、召回降**：Precision 0.8120→0.8411（+0.029），"
+          "但 Recall 0.90→0.75（**−0.15**），F1 0.8538→0.7930（−0.061）。"
+          "小目标在 256 下可分辨性下降, 漏检显著增多, 这是后面分割退化的主因。")
+        A("")
+        A("### 4.7.2 分割性能")
+        A("")
+        A("| 输入尺寸 | 方案 | n | Dice ↑ | IoU ↑ | HD95 ↓ | ASSD ↓ | 边界F1 ↑ | Dice<0.5 ↓ |")
+        A("|---|---|---|---|---|---|---|---|---|")
+        for _, r in a.sort_values(["size", "method"], ascending=[False, True]).iterrows():
+            A(f"| {int(r['size'])}×{int(r['size'])} | {r['name']} | {int(r['n'])} | **{r['dice']:.4f}** | "
+              f"{r['iou']:.4f} | {r['hd95']:.2f} | {r['assd']:.2f} | {r['bf1']:.4f} | {r['fail']*100:.1f}% |")
+        A("")
+        A("### 4.7.3 推理速度（每张图端到端, 含预处理/检测/分割解码）")
+        A("")
+        A("| 输入尺寸 | 方案 | 均值 ms ↓ | 中位数 ms | 标准差 | FPS ↑ |")
+        A("|---|---|---|---|---|---|")
+        for _, r in a.sort_values(["size", "method"], ascending=[False, True]).iterrows():
+            A(f"| {int(r['size'])}×{int(r['size'])} | {r['name']} | **{r['end2end_ms_mean']:.2f}** | "
+              f"{r['end2end_ms_median']:.2f} | {r['end2end_ms_std']:.2f} | {r['fps']:.1f} |")
+        A("")
+    A("**结论**：")
+    A("")
+    A("1. **512 是明显的优选工作点**：三种方案在 512 下 Dice 都在 0.771–0.780；"
+      "降到 256 后 A-box 0.7781→0.5761（−0.202）、EdgeSAM 0.7710→0.5785（−0.193）、"
+      "B 0.7798→0.6278（−0.152），同时 Dice<0.5 的失败率从 12–13% 涨到 29–34%。")
+    A("2. **退化的主因是检测而非分割头**：256 下召回掉 0.15（漏检 +18 个目标），"
+      "所有方案的误差都从检测框传递下来；B 退化相对最小，因为它的分割头与检测头共享"
+      "同一尺度的特征、对分辨率下降更鲁棒。")
+    A("3. **速度收益不足以补偿精度损失**：从 512 降到 256，A-box 只快 4.1ms（19.36→15.25，"
+      "FPS +27%）、EdgeSAM 快 7.6ms、B 快 1.5ms，但 Dice 掉了 0.15–0.20。"
+      "原因：**EdgeSAM 无论输入尺寸都固定按 1024×1024 处理**（其编码器开销不变），"
+      "而 A-box/refiner 只在检测框内取 64 张 32×32 ROI，对输入尺寸本就不敏感——"
+      "三者的耗时主要由检测器与固定尺寸编码器决定。")
+    A("4. **横向对比（512）**：B 0.7798 / 11.61ms 与 A-box 0.7781 / 19.36ms 精度基本持平，"
+      "EdgeSAM 0.7710 / 48.77ms 精度略低且慢 4 倍。**256 下排序不变但差距拉大**："
+      "B 0.6278 > EdgeSAM 0.5785 ≈ A-box 0.5761。")
+    A("")
+    A("![input size](input_size/fig_input_size.png)")
+    A("")
     A("## 5. 复现步骤")
     A("")
     A("```bash")

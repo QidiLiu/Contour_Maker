@@ -17,6 +17,8 @@ from . import geometry as G
 from .config import AugConfig, RefinerConfig
 from .rough import RoughResult
 from .box_aug import polygon_mask, sample_box_shape
+
+PAD_FILL = 0.0   # 窗口完全出界时的填充值
 from .rough import bbox_from_mask, box_rough_contour, otsu_adaptive_rough_contour
 
 
@@ -144,7 +146,10 @@ def extract_patches(
         xa, xb = max(0, x1), min(W, x2)
         ya, yb = max(0, y1), min(H, y2)
         patch = imgf[ya:yb, xa:xb]
-        if pad_l or pad_t or pad_r or pad_b:
+        if patch.size == 0:
+            # 窗口完全落在图像外 (退化框): 用常量填充, 避免 np.pad 失败
+            patch = np.full((max(1, y2 - y1), max(1, x2 - x1)), PAD_FILL, np.float32)
+        elif pad_l or pad_t or pad_r or pad_b:
             patch = np.pad(patch, ((pad_t, pad_b), (pad_l, pad_r)), mode="edge")
         patch = cv2.resize(patch, (size, size), interpolation=cv2.INTER_AREA)
         if normalize:
