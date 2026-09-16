@@ -1,0 +1,19 @@
+{
+  "refiner": "runs/refiner_v3_A5_busi-ddti-tn3k/best.pt",
+  "det": "runs/det_yolo26n_sub/weights/best.pt",
+  "seg": "runs/seg_yolo26n_sub/weights/best.pt",
+  "sam": [
+    "edgesam",
+    "efficientvit-t"
+  ],
+  "sam_ckpt": "weights/sam_finetuned",
+  "split": "test",
+  "uids_file": "data/yolo_subset/_subset_splits.csv",
+  "imgsz": 512,
+  "conf": 0.25,
+  "limit": 200,
+  "repeats": 2,
+  "warmup": 6,
+  "no_accuracy": false,
+  "out": "reports/bench_final_ft"
+}

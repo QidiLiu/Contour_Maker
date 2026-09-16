@@ -328,6 +328,42 @@ def main() -> int:
     A("")
     A("![b+refiner](B_plus_refiner/vis_bplusref_busi_c4322390d6.png)")
     A("")
+    A("## 4.4 第四条对照：YOLO26n + EdgeSAM / EfficientSAM（精度 + 推理速度）")
+    A("")
+    A("两个 SAM 变体均在**同一训练集**上以相同的 YOLO26n 检测框为提示做适配：冻结图像编码器，"
+      "仅微调 mask decoder（4.06M 可训练参数，4 epoch）。零样本（不做适配）结果一并列出。")
+    A("")
+    sc = OUT / "final" / "sam_compare.csv"
+    if sc.exists():
+        t = pd.read_csv(sc)
+        A("| 流水线 | Dice ↑ | IoU ↑ | HD95 ↓ | 零样本 Dice | Dice<0.5 占比 ↓ | 端到端 ms/张 ↓ | FPS ↑ |")
+        A("|---|---|---|---|---|---|---|---|")
+        for _, r in t.sort_values("end2end_ms_mean").iterrows():
+            zs = "—" if pd.isna(r.get("dice_zeroshot")) else f"{r['dice_zeroshot']:.4f}"
+            A(f"| {r['name']} | **{r['dice']:.4f}** | {r['iou']:.4f} | {r['hd95']:.2f} | {zs} | "
+              f"{r['fail']*100:.1f}% | {r['end2end_ms_mean']:.2f} | {r['fps']:.1f} |")
+        A("")
+    A("**结论**：")
+    A("")
+    A("1. **精度上四者接近，速度差距巨大**：B（YOLO26n-seg）0.7735 / 10.2ms，"
+      "EfficientSAM(ViT-T) 0.7682 / 99.7ms，EdgeSAM 0.7648 / 35.8ms，方案 A 0.7632 / 15.9ms。"
+      "**EfficientSAM 精度只差 0.005，却慢 10 倍**（1024×1024 输入 + ViT 注意力）；"
+      "B 在精度与速度上同时占优。")
+    A("2. **SAM 类模型必须做域适配**：零样本时 EfficientSAM(ViT-T) 完全失效（Dice 0.0000，"
+      "输出空 mask 或与目标无关的大块）；微调 decoder 后提升到 0.7682。"
+      "EdgeSAM 零样本即 0.6180，微调后 0.7648（+0.147）——说明其 RepViT 编码器的自然图像"
+      "特征迁移性更好，但两者都必须适配才能用于超声。")
+    A("3. **方案 A 的性价比最高**：精度与 SAM 系持平（0.7632 vs 0.7682），"
+      "端到端延迟 15.9ms（比 EfficientSAM 快 6.3 倍、比 EdgeSAM 快 2.2 倍），且模型仅 0.47M 参数、"
+      "只需 32×32 的局部 ROI 输入，显存/算力需求远低于 1024×1024 的 SAM 系。")
+    A("4. **推理速度明细**：每张图端到端包含图像读取、YOLO26n 检测、预处理与分割解码，"
+      "GPU 同步计时，预热 6 张后统计（全测试集 330 张 × 2 轮 = 660 次）。"
+      "分割模块单独耗时：A 6.9ms / B 10.2ms（含检测）/ EdgeSAM 8.9ms / EfficientSAM 9.8ms，"
+      "**SAM 系的主要开销在 1024×1024 编码器**（EdgeSAM 编码约 27ms、EfficientSAM 约 91ms，"
+      "相对检测约 3.6ms）。")
+    A("")
+    A("![acc vs speed](final/fig_acc_speed.png)")
+    A("")
     A("## 5. 复现步骤")
     A("")
     A("```bash")

@@ -45,6 +45,25 @@ Dice 0.7923 → 0.7813（配对比较，58% 目标变差）。原因是该 refin
 （平均 Dice≈0.54）校准，面对本就准确的 seg mask 属分布外输入，会过修正——
 把 GT 轮廓喂给它时 Dice 从 0.9954 掉到 0.9127（100% 变差）。详见 `reports/REPORT.md` §4.2。
 
+## 四方案对比：精度 × 推理速度（同一数据集 / 同一划分 / 测试集）
+
+| 流水线 | Dice ↑ | IoU ↑ | HD95(px) ↓ | 零样本 Dice | 端到端 ms/张 ↓ | FPS ↑ |
+|---|---|---|---|---|---|---|
+| **B: YOLO26n-seg** | **0.7735** | 0.7040 | 15.93 | — | **10.32** | **96.9** |
+| YOLO26n + EfficientSAM (ViT-T，微调 decoder) | 0.7682 | 0.6947 | 16.83 | 0.0000 | 99.71 | 10.0 |
+| YOLO26n + EdgeSAM (微调 decoder) | 0.7648 | 0.6899 | **15.46** | 0.6180 | 35.76 | 28.0 |
+| A: YOLO26n + Otsu/框 + contour-refiner | 0.7632 | 0.6842 | 16.30 | — | 15.95 | 62.7 |
+
+* 两个 SAM 变体在**同一训练集**上适配：冻结图像编码器，仅微调 mask decoder（4.06M 参数，4 epoch），
+  提示框与其它方案共用同一个 YOLO26n 检测器。
+* **零样本直接用于超声会失效**：EfficientSAM Dice 0.0000（输出空 mask/无关大块）、EdgeSAM 0.6180；
+  微调后分别达到 0.7682 / 0.7648。
+* **速度差距主要来自 1024×1024 编码器**：SAM 系分割模块约 9–10ms，但端到端 36ms（EdgeSAM）与
+  100ms（EfficientSAM），B 仅 10.3ms、方案 A 16.0ms。B 在精度与速度上同时占优；
+  EfficientSAM 精度只差 0.005 却慢近 10 倍。
+* 速度口径：全测试集 330 张 × 2 轮 = 660 次，含图像读取、YOLO26n 检测、预处理与分割解码，
+  GPU 同步计时，预热 6 张，RTX 4060 Ti 16GB。
+
 ## contour-refiner 设计（严格按给定规格）
 
 * 每个目标取 `P = 64` 个粗糙轮廓点（等弧长、逆时针、首尾相接）。
@@ -118,6 +137,13 @@ PYTHONPATH=src $PY scripts/03_train_refiner.py --level 5 --tag A5
 PYTHONPATH=src $PY scripts/04_export_yolo.py
 PYTHONPATH=src $PY scripts/05_train_yolo.py --kind det --model yolo26n.pt
 PYTHONPATH=src $PY scripts/05_train_yolo.py --kind seg --model yolo26n-seg.pt
+
+# 3.5) EdgeSAM / EfficientSAM 对照：微调 mask decoder + 精度/速度评测
+PYTHONPATH=src $PY scripts/19_finetune_sam.py --variant edgesam --epochs 4 --lr 5e-4
+PYTHONPATH=src $PY scripts/19_finetune_sam.py --variant efficientvit-t --epochs 4 --lr 5e-4
+PYTHONPATH=src $PY scripts/18_bench_sam.py --limit 200 --sam edgesam efficientvit-t \
+    --sam-ckpt weights/sam_finetuned --out reports/bench_final_ft
+PYTHONPATH=src $PY scripts/20_sam_compare.py
 
 # 4) 统一评估（同一 test split、同一指标）
 PYTHONPATH=src $PY scripts/07_evaluate.py \

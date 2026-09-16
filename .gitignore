@@ -230,3 +230,5 @@ data/yolo/
 data/yolo_subset/
 runs/
 *.pt
+data/cache/sam_embed/
+third_party/
