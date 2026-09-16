@@ -15,6 +15,8 @@ import numpy as np
 
 from . import geometry as G
 from .config import AugConfig, RefinerConfig
+from .rough import RoughResult
+from .box_aug import polygon_mask, sample_box_shape
 from .rough import bbox_from_mask, box_rough_contour, otsu_adaptive_rough_contour
 
 
@@ -233,6 +235,20 @@ def _otsu(patch: np.ndarray) -> float:
     return float(np.argmax(sigma_b))
 
 
+
+def _augmented_box_rough(image: np.ndarray, bbox, acfg: AugConfig,
+                         rng: np.random.Generator) -> RoughResult:
+    """框初始化分支: 用 (可增强的) 四边形作为粗糙轮廓。"""
+    H, W = image.shape[:2]
+    pts = sample_box_shape(tuple(float(v) for v in bbox), (H, W), acfg, rng)
+    mask = polygon_mask(pts, (H, W))
+    x1, y1 = pts[:, 0].min(), pts[:, 1].min()
+    x2, y2 = pts[:, 0].max(), pts[:, 1].max()
+    return RoughResult(mask=mask, contour=pts.astype(np.float32),
+                       bbox=(int(x1), int(y1), int(x2), int(y2)),
+                       threshold=float("nan"), ok=True)
+
+
 # ---------------------------------------------------------------- main builder
 @dataclass
 class TargetSpec:
@@ -271,13 +287,16 @@ def build_sample(
     # box 比例: 部分样本直接用检测框矩形作为初始轮廓, 让模型学会"从框出发"的精细化,
     # 从而在 Otsu 失败时仍可工作 (推理端有同样机制, 见 rough_contour_with_fallback)
     use_box = acfg.box_init_prob > 0 and rng.random() < acfg.box_init_prob
+    box_pts_aug: np.ndarray | None = None
     if use_box:
-        rough = box_rough_contour(image, bbox_used, shrink=0.0)
+        rough = _augmented_box_rough(image, bbox_used, acfg, rng)
+        box_pts_aug = rough.contour
     else:
         rough = otsu_adaptive_rough_contour(image, bbox_used, polarity=spec.polarity)
         if not rough.ok or len(rough.contour) < 3:
             if acfg.box_fallback:
-                rough = box_rough_contour(image, bbox_used, shrink=0.0)
+                rough = _augmented_box_rough(image, bbox_used, acfg, rng)
+                box_pts_aug = rough.contour
     if not rough.ok or len(rough.contour) < 3:
         return None
 
@@ -298,13 +317,13 @@ def build_sample(
                      clamp01(bbox_used[2] / W) * W, clamp01(bbox_used[3] / H) * H)
         # 变换后重新提取粗糙轮廓 (保证粗糙轮廓始终来自图像本身的 Otsu 分割)
         if use_box:
-            rough_pts_src = box_rough_contour(image, bbox_used, shrink=0.0).contour
+            rough_pts_src = _augmented_box_rough(image, bbox_used, acfg, rng).contour
         else:
             rough2 = otsu_adaptive_rough_contour(image, bbox_used, polarity=spec.polarity)
             if rough2.ok and len(rough2.contour) >= 3:
                 rough_pts_src = rough2.contour
             elif acfg.box_fallback:
-                rough_pts_src = box_rough_contour(image, bbox_used, shrink=0.0).contour
+                rough_pts_src = _augmented_box_rough(image, bbox_used, acfg, rng).contour
         # 旋转变换后 GT 轮廓方向可能翻转, 重新规范化
         exact_pts = G.canonical_start(G.ensure_ccw(G.resample_closed(exact_pts, 4 * rcfg.n_points)))
         exact_pts = G.resample_closed(exact_pts, rcfg.n_points)

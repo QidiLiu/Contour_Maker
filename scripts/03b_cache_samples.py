@@ -67,6 +67,13 @@ def main() -> int:
     ap.add_argument("--box-init-prob", type=float, default=None,
                     help="用检测框矩形作为初始轮廓的样本比例 (0~1)")
     ap.add_argument("--box-fallback", type=int, default=None, help="Otsu 失败时是否回退到框矩形 (0/1)")
+    ap.add_argument("--box-aug", type=int, default=None, help="是否启用框形状增强 (0/1)")
+    ap.add_argument("--box-init-prob2", type=float, default=None, help="覆盖 box_init_prob (别名)")
+    ap.add_argument("--box-side-jitter", type=float, default=None)
+    ap.add_argument("--box-scale-jitter", type=float, default=None)
+    ap.add_argument("--box-shift-jitter", type=float, default=None)
+    ap.add_argument("--box-interior-offset", type=float, default=None)
+    ap.add_argument("--box-corner-jitter", type=float, default=None)
     args = ap.parse_args()
 
     rcfg = RefinerConfig()
@@ -79,6 +86,15 @@ def main() -> int:
         acfg.box_init_prob = float(args.box_init_prob)
     if args.box_fallback is not None:
         acfg.box_fallback = bool(args.box_fallback)
+    if args.box_init_prob2 is not None:
+        acfg.box_init_prob = float(args.box_init_prob2)
+    if args.box_aug is not None:
+        acfg.box_aug = bool(args.box_aug)
+    for k in ("box_side_jitter", "box_scale_jitter", "box_shift_jitter",
+              "box_interior_offset", "box_corner_jitter"):
+        v = getattr(args, k)
+        if v is not None:
+            setattr(acfg, k, float(v))
     sub = args.out_subdir or f"L{args.level}_v{args.variants}_wr{int(rcfg.window_ratio*100)}_p{rcfg.n_points}"
     out_dir = CACHE / sub
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -144,6 +160,12 @@ def main() -> int:
                        datasets=",".join(args.datasets), splits=",".join(args.splits),
                        window_ratio=rcfg.window_ratio, n_points=rcfg.n_points,
                        roi_size=rcfg.roi_size, polarity=args.polarity,
+                       box_aug=acfg.box_aug, box_init_prob=acfg.box_init_prob,
+                       box_side_jitter=acfg.box_side_jitter,
+                       box_scale_jitter=acfg.box_scale_jitter,
+                       box_shift_jitter=acfg.box_shift_jitter,
+                       box_interior_offset=acfg.box_interior_offset,
+                       box_corner_jitter=acfg.box_corner_jitter,
                        n_targets=n_ok, n_fail=n_fail, n_samples=len(cache))).to_json(indent=2))
     print(f"[cache] 完成 targets={n_ok} samples={len(cache)} fail={n_fail} -> {out_dir}")
     return 0

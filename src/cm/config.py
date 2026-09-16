@@ -90,6 +90,14 @@ class AugConfig:
     box_init_prob: float = 0.25         # 用检测框矩形本身作为初始轮廓的样本比例
     box_fallback: bool = True           # Otsu 分割失败时回退到框矩形
 
+    # ---- 针对"框初始化"分支的形状级增强 (不改模型结构) ----
+    box_aug: bool = False               # 总开关
+    box_side_jitter: float = 0.10       # 每条边独立抖动幅度 (相对宽/高)
+    box_scale_jitter: float = 0.12      # 宽高独立缩放幅度 (相对值, 1±x)
+    box_shift_jitter: float = 0.08      # 整体平移幅度 (相对宽/高)
+    box_interior_offset: float = 0.18   # 轮廓在框内的随机内缩上限 (0=贴边)
+    box_corner_jitter: float = 0.05     # 四角独立抖动幅度 (相对宽/高)
+
     def enabled(self, level: int) -> bool:
         return self.level >= level
 
