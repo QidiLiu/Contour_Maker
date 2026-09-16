@@ -30,12 +30,25 @@ from cm import geometry as G  # noqa: E402
 from cm import metrics as M  # noqa: E402
 from cm import roi as R  # noqa: E402
 from cm.config import IOU_MATCH_THRESHOLD, REPORTS, SPLITS, UNIFIED  # noqa: E402
-from cm.rough import box_rough_contour  # noqa: E402
+from cm.rough import box_rough_contour, otsu_adaptive_rough_contour  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
     "ev", str(Path(__file__).resolve().parent / "07_evaluate.py"))
 ev = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ev)
+
+
+def _edge_score(img, mask) -> float:
+    """候选初始轮廓的边界证据打分: 边界梯度均值 - 内部灰度标准差。"""
+    m = (mask > 0).astype(np.uint8)
+    if m.sum() < 20:
+        return -1e9
+    band = m - cv2.erode(m, np.ones((3, 3), np.uint8))
+    gx = cv2.Sobel(img.astype(np.float32), cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(img.astype(np.float32), cv2.CV_32F, 0, 1, ksize=3)
+    g = np.hypot(gx, gy)
+    e = float(g[band > 0].mean()) if (band > 0).any() else 0.0
+    return e - 0.5 * float(img[m > 0].std())
 
 
 def sync(device):
@@ -75,6 +88,8 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0, help=">0 只跑前 N 张 (速度测试建议 100+)")
     ap.add_argument("--repeats", type=int, default=1, help="速度测试重复轮数 (取每张图平均)")
     ap.add_argument("--warmup", type=int, default=5, help="正式计时前的预热图片数")
+    ap.add_argument("--a-variants", default="all",
+                    help="方案 A 的初始化策略: all 或逗号分隔 (A_box,A_otsu,A_otsu_fb,A_select)")
     ap.add_argument("--no-accuracy", action="store_true", help="只测速度")
     ap.add_argument("--out", default=str(REPORTS / "bench_sam"))
     args = ap.parse_args()
@@ -115,7 +130,9 @@ def main() -> int:
         sp = sp.head(args.limit)
     print(f"[bench] 测试图片 {len(sp)} 张", flush=True)
 
-    methods = ["A_box", "B_seg"] + [f"SAM_{v}" for v in args.sam]
+    a_variants = [v for v in ("A_box", "A_otsu", "A_otsu_fb", "A_select")
+                  if args.a_variants == "all" or v in args.a_variants.split(",")]
+    methods = a_variants + ["B_seg"] + [f"SAM_{v}" for v in args.sam]
 
     # 预读图片到内存, 避免磁盘 I/O 干扰速度测量
     cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
@@ -136,20 +153,52 @@ def main() -> int:
                  if res.boxes is not None and len(res.boxes) else [])
         out: dict[str, tuple[list[np.ndarray], float, float]] = {}
 
-        # A-box
+        # ---- 方案 A 的三种初始化策略 (共用同一个 refiner) ----
+        def refine(init_pts, b):
+            p2 = ev.refine_contour(refiner, rcfg, img, b, init_pts, device)
+            return G.contour_to_mask(p2, (H, W))
+
         sync(device); t0 = time.perf_counter()
-        preds = []
+        p_box, p_otsu, p_fb, p_sel = [], [], [], []
         for b in boxes:
             bb = box_rough_contour(img, b)
-            if not bb.ok:
-                continue
-            pts0 = G.resample_closed(G.ensure_ccw(bb.contour), rcfg.n_points)
-            pts = ev.refine_contour(refiner, rcfg, img, b, pts0, device)
-            mk = G.contour_to_mask(pts, (H, W))
-            if mk.sum():
-                preds.append(mk)
+            box_pts = (G.resample_closed(G.ensure_ccw(bb.contour), rcfg.n_points) if bb.ok else None)
+            rr = otsu_adaptive_rough_contour(img, b, polarity="dark")
+            otsu_pts = (G.resample_closed(G.ensure_ccw(rr.contour), rcfg.n_points)
+                        if (rr.ok and len(rr.contour) >= 3) else None)
+            # 纯框
+            if box_pts is not None:
+                mk = refine(box_pts, b)
+                if mk.sum():
+                    p_box.append(mk)
+            # 纯 Otsu (失败则跳过)
+            if otsu_pts is not None:
+                mk = refine(otsu_pts, b)
+                if mk.sum():
+                    p_otsu.append(mk)
+            # Otsu + 框回退 (训练/推理分布一致: 有 Otsu 用 Otsu, 否则用框)
+            init_fb = otsu_pts if otsu_pts is not None else box_pts
+            if init_fb is not None:
+                mk = refine(init_fb, b)
+                if mk.sum():
+                    p_fb.append(mk)
+            # 两候选择优 (边界梯度证据打分, 只精细化胜者)
+            if otsu_pts is not None and box_pts is not None:
+                s_o = _edge_score(img, G.contour_to_mask(otsu_pts, (H, W)))
+                s_b = _edge_score(img, G.contour_to_mask(box_pts, (H, W)))
+                init_sel = otsu_pts if s_o >= s_b else box_pts
+            else:
+                init_sel = otsu_pts if otsu_pts is not None else box_pts
+            if init_sel is not None:
+                mk = refine(init_sel, b)
+                if mk.sum():
+                    p_sel.append(mk)
         sync(device); t_seg = time.perf_counter() - t0
-        out["A_box"] = (preds, t_det, t_seg)
+        n_a = 4
+        out["A_box"] = (p_box, t_det, t_seg / n_a)
+        out["A_otsu"] = (p_otsu, t_det, t_seg / n_a)
+        out["A_otsu_fb"] = (p_fb, t_det, t_seg / n_a)
+        out["A_select"] = (p_sel, t_det, t_seg / n_a)
 
         # B: YOLO26n-seg (检测+分割一次前向)
         sync(device); t0 = time.perf_counter()
