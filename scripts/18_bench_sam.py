@@ -79,7 +79,8 @@ def main() -> int:
     ap.add_argument("--det", default="runs/det_yolo26n_sub/weights/best.pt")
     ap.add_argument("--seg", default="runs/seg_yolo26n_sub/weights/best.pt")
     ap.add_argument("--sam", nargs="*", default=["edgesam", "efficientvit-t"],
-                    choices=["edgesam", "efficientvit-t", "efficientvit-s"])
+                    choices=["edgesam", "efficientvit-t", "efficientvit-s",
+                             "litemedsam", "swin_litemedsam"])
     ap.add_argument("--sam-ckpt", default=None, help="可选: 微调后的 SAM 权重目录")
     ap.add_argument("--split", default="test")
     ap.add_argument("--uids-file", default="data/yolo_subset/_subset_splits.csv")
@@ -105,6 +106,13 @@ def main() -> int:
 
     sams = {}
     for v in args.sam:
+        if v in ("litemedsam", "swin_litemedsam"):
+            from cm.litemedsam import build_lite
+            variant = "lite" if v == "litemedsam" else "swin"
+            w = build_lite(variant, device=str(device))
+            sams[v] = w
+            print(f"[bench] 加载 {w.name} ({w.n_params_m:.2f}M)", flush=True)
+            continue
         from cm.sam_models import build_sam
         w = build_sam(v, device=str(device))
         if args.sam_ckpt:

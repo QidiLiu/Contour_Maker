@@ -232,3 +232,5 @@ runs/
 *.pt
 data/cache/sam_embed/
 third_party/
+third_party/LiteMedSAM/
+third_party/Swin_LiteMedSAM/
