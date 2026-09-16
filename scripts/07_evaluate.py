@@ -201,6 +201,21 @@ def main() -> int:
                 preds.append(dict(mask=mk, contour=poly, bbox=M.mask_bbox(mk)))
             variants["yolo26n_seg"] = preds
 
+            # 方案 B + contour-refiner: 把 seg mask 当作粗糙轮廓, 用 refiner 逐点精细化
+            if refiner is not None:
+                refined = []
+                for pr in preds:
+                    nb = pr["bbox"]
+                    if nb is None:
+                        continue
+                    rough = G.resample_closed(G.ensure_ccw(pr["contour"]), rcfg.n_points)
+                    pts = refine_contour(refiner, rcfg, image, nb, rough, device)
+                    mk2 = G.contour_to_mask(pts, (H, W))
+                    if mk2.sum() == 0:
+                        continue
+                    refined.append(dict(mask=mk2, contour=pts, bbox=M.mask_bbox(mk2), rough_pts=rough))
+                variants["seg_refiner"] = refined
+
         # 方案 A: Otsu 粗糙轮廓 (+ refiner)
         def run_pipeline(box_list, tag: str, use_refiner: bool):
             preds = []

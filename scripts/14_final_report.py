@@ -17,9 +17,10 @@ from cm.config import REPORTS, ROOT, RUNS  # noqa: E402
 OUT = REPORTS
 DATASET_LABEL = {"busi": "BUSI 乳腺肿瘤", "tn3k": "TN3K 甲状腺结节", "ddti": "DDTI 甲状腺结节",
                  "tg3k": "TG3K 甲状腺腺体"}
-METHOD_ORDER = ["yolo26n_seg", "refiner_gtbox", "refiner", "rough_otsu_gtbox", "rough_otsu"]
+METHOD_ORDER = ["yolo26n_seg", "seg_refiner", "refiner_gtbox", "refiner", "rough_otsu_gtbox", "rough_otsu"]
 METHOD_LABEL = {
     "yolo26n_seg": "**B: YOLO26n-seg**(端到端)",
+    "seg_refiner": "**B+refiner: YOLO26n-seg mask→contour-refiner**",
     "refiner": "**A: Otsu+contour-refiner**(YOLO 框)",
     "refiner_gtbox": "A: Otsu+contour-refiner(GT 框)",
     "rough_otsu": "A-0: 仅 Otsu 粗糙轮廓(YOLO 框)",
@@ -197,6 +198,51 @@ def main() -> int:
       "（0.12 → 0.43 Dice，仅靠改极性判断即可提升 3.6 倍）；而方案 B 的分割头在训练分布外"
       "同样直接失效（Dice=0，因为它从未见过腺体类别）。因此该场景下**两者都需要针对性训练**，"
       "不能据此判定优劣；但它明确了方案 A 的适用前提：**目标必须是相对周围组织的低回声区**。")
+    A("")
+    A("## 4.2 追加实验：把 contour-refiner 接到 YOLO26n-seg 之后 (B+refiner)")
+    A("")
+    A("把 B 的输出 mask 当作\"粗糙轮廓\"（重采样为 64 点）再喂给同一个 contour-refiner，"
+      "其余条件完全不变。测试集结果：")
+    A("")
+    bp = OUT / "B_plus_refiner" / "per_image.csv"
+    if bp.exists():
+        b = pd.read_csv(bp)
+        b = b[~b["method"].astype(str).str.endswith("__detstats")]
+        agg = b[b["method"].isin(["yolo26n_seg", "seg_refiner"])].groupby("method").agg(
+            n=("dice", "size"), dice=("dice", "mean"), iou=("iou", "mean"),
+            hd95=("hd95", "mean"), assd=("assd", "mean"), bf1=("bf1", "mean"),
+            area_err=("area_err", "mean")).reset_index()
+        A("| 方法 | n | Dice ↑ | IoU ↑ | HD95(px) ↓ | ASSD(px) ↓ | 边界F1 ↑ | 面积误差 ↓ |")
+        A("|---|---|---|---|---|---|---|---|")
+        for _, r in agg.sort_values("dice", ascending=False).iterrows():
+            A(f"| {METHOD_LABEL.get(r['method'], r['method']).replace('**','')} | {int(r['n'])} | "
+              f"**{r['dice']:.4f}** | {r['iou']:.4f} | {r['hd95']:.2f} | {r['assd']:.2f} | "
+              f"{r['bf1']:.4f} | {r['area_err']:.3f} |")
+        A("")
+    A("**结论：没有提升，反而下降 0.011 Dice。** 配对比较 (同 337 个预测目标)："
+      "Dice 0.7923 → 0.7813，58% 的目标变差、32% 变好。两条实测证据：")
+    A("")
+    A("1. **该 refiner 是为\"粗糙轮廓\"校准的**：把 GT 轮廓 (Dice 0.9954) 当作输入喂给它，"
+      "输出 Dice 降到 0.9127（**100% 样本都变差**）。它的训练分布是\"框→Otsu\"粗糙轮廓"
+      "（平均 Dice ≈ 0.54），学到的是\"大幅修正\"策略；面对本就准确的 seg mask 时属于"
+      "分布外输入，修正量过大导致过修正。")
+    A("2. **B 的精度已高于该 refiner 的修正能力**：B 在有预测的目标上 Dice 中位数 0.90、"
+      "p10 = 0.80；按质量分桶后，refiner 在**每一个**质量区间都是负收益"
+      "（0.7–0.85 区间 −0.021，0.85–0.95 区间 −0.014，>0.95 区间 −0.022）。")
+    A("")
+    A("| 级联方式 | 测试集 Dice | 说明 |")
+    A("|---|---|---|")
+    A("| B: YOLO26n-seg 单独 | **0.7923** | 端到端，已含检测+轮廓 |")
+    A("| B + refiner（现有 Otsu 训练的 refiner） | 0.7813 | 分布外输入，过修正 |")
+    A("| A: 检测框 → Otsu → refiner | 0.6602 | 提升来自初始化质量 |")
+    A("| A: GT 框 → Otsu → refiner | 0.7808 | 接近 B，仍依赖初始轮廓 |")
+    A("")
+    A("**值得尝试的前提**：只有用**与 seg 输出同分布**的样本重训 refiner（以\"seg mask + 轻微形变\""
+      "作为粗糙轮廓，而非 Otsu 轮廓）才可能有小幅收益。理论上限有限：B 的分割误差中位数已 0.90，"
+      "剩余误差主要来自 11% 的完全漏检 (Dice=0，属于检测问题，轮廓精细化无法修复)。"
+      "要突破应改进检测/分类头，而非叠加轮廓回归。")
+    A("")
+    A("![b+refiner](B_plus_refiner/vis_bplusref_busi_c4322390d6.png)")
     A("")
     A("## 5. 复现步骤")
     A("")
