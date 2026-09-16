@@ -64,6 +64,9 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--splits", nargs="*", default=["train", "val"])
     ap.add_argument("--out-subdir", default=None, help="缓存子目录名 (默认按参数自动生成)")
+    ap.add_argument("--box-init-prob", type=float, default=None,
+                    help="用检测框矩形作为初始轮廓的样本比例 (0~1)")
+    ap.add_argument("--box-fallback", type=int, default=None, help="Otsu 失败时是否回退到框矩形 (0/1)")
     args = ap.parse_args()
 
     rcfg = RefinerConfig()
@@ -72,6 +75,10 @@ def main() -> int:
     if args.n_points:
         rcfg.n_points = args.n_points
     acfg = AugConfig(level=args.level)
+    if args.box_init_prob is not None:
+        acfg.box_init_prob = float(args.box_init_prob)
+    if args.box_fallback is not None:
+        acfg.box_fallback = bool(args.box_fallback)
     sub = args.out_subdir or f"L{args.level}_v{args.variants}_wr{int(rcfg.window_ratio*100)}_p{rcfg.n_points}"
     out_dir = CACHE / sub
     out_dir.mkdir(parents=True, exist_ok=True)

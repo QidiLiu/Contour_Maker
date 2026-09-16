@@ -27,6 +27,7 @@ METHOD_LABEL = {
     "refiner_gtbox": "A 完整 (GT 框)",
     "yolo26n_seg": "B YOLO26n-seg",
     "seg_refiner": "B+refiner (seg mask→refiner)",
+    "refiner_box": "A-box: 框初始化+refiner (YOLO 框)",
 }
 DATASET_LABEL = {"busi": "BUSI 乳腺", "tn3k": "TN3K 甲状腺", "ddti": "DDTI 甲状腺",
                  "tg3k": "TG3K 腺体"}

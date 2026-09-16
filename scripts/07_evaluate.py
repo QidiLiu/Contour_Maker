@@ -27,6 +27,7 @@ from cm import geometry as G  # noqa: E402
 from cm import metrics as M  # noqa: E402
 from cm import roi as R  # noqa: E402
 from cm.config import IOU_MATCH_THRESHOLD, REPORTS, RUNS, SPLITS, UNIFIED, AugConfig, RefinerConfig  # noqa: E402
+from cm.rough import box_rough_contour  # noqa: E402
 from cm.model import build_refiner  # noqa: E402
 
 
@@ -244,6 +245,21 @@ def main() -> int:
             base_boxes = det_boxes if det_boxes else ([g["bbox"] for g in gts] if refiner is None else [])
             if base_boxes:
                 variants["rough_otsu"] = run_pipeline(base_boxes, "rough", False)
+        # 方案 A': 框矩形初始化 -> refiner (与 Otsu 初始化互补, 见 reports/recall_strategy/)
+        if refiner is not None and det_boxes:
+            box_preds = []
+            for b in det_boxes:
+                bb = box_rough_contour(image, b, shrink=0.0)
+                if not bb.ok or len(bb.contour) < 3:
+                    continue
+                pts0 = G.resample_closed(G.ensure_ccw(bb.contour), rcfg.n_points)
+                pts = refine_contour(refiner, rcfg, image, b, pts0, device)
+                mk = G.contour_to_mask(pts, (H, W))
+                if mk.sum() == 0:
+                    continue
+                box_preds.append(dict(mask=mk, contour=pts, bbox=M.mask_bbox(mk), rough_pts=pts0))
+            variants["refiner_box"] = box_preds
+
         if refiner is not None:
             gt_boxes = [g["bbox"] for g in gts]
             variants["refiner_gtbox"] = run_pipeline(gt_boxes, "refiner_gt", True)
