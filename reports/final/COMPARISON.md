@@ -57,15 +57,22 @@
 
 ## 训练记录 (验证集)
 
-| run                          |   best_val_dice |   best_epoch |   rough_val_dice |   epochs |
-|:-----------------------------|----------------:|-------------:|-----------------:|---------:|
-| refiner_v2_A1_busi-ddti-tn3k |          0.8924 |           22 |           0.7171 |       14 |
-| refiner_v2_A2_busi-ddti-tn3k |          0.891  |           20 |           0.73   |       14 |
-| refiner_v3_A0_busi-ddti-tn3k |          0.8909 |           16 |           0.7452 |       14 |
-| refiner_v2_A0_busi-ddti-tn3k |          0.8905 |           25 |           0.728  |       14 |
-| refiner_v2_A3_busi-ddti-tn3k |          0.89   |           18 |           0.7285 |       14 |
-| refiner_v2_A4_busi-ddti-tn3k |          0.8702 |           18 |           0.6775 |       14 |
-| refiner_v3_A5_busi-ddti-tn3k |          0.856  |           22 |           0.6836 |       14 |
-| refiner_v2_A5_busi-ddti-tn3k |          0.8521 |           18 |           0.6775 |       14 |
-| refiner_A5_busi-ddti-tn3k    |          0.8439 |           27 |           0.5676 |       11 |
-| refiner_smoke_busi           |          0.7752 |            4 |           0.6311 |        5 |
+| run                                |   best_val_dice |   best_epoch |   rough_val_dice |   epochs |
+|:-----------------------------------|----------------:|-------------:|-----------------:|---------:|
+| refiner_v2_A1_busi-ddti-tn3k       |          0.8924 |           22 |           0.7171 |       14 |
+| refiner_v2_A2_busi-ddti-tn3k       |          0.891  |           20 |           0.73   |       14 |
+| refiner_v3_A0_busi-ddti-tn3k       |          0.8909 |           16 |           0.7452 |       14 |
+| refiner_v2_A0_busi-ddti-tn3k       |          0.8905 |           25 |           0.728  |       14 |
+| refiner_v2_A3_busi-ddti-tn3k       |          0.89   |           18 |           0.7285 |       14 |
+| refiner_v4_boxA5_busi-ddti-tn3k    |          0.8868 |           14 |           0.688  |       14 |
+| refiner_v2_A4_busi-ddti-tn3k       |          0.8702 |           18 |           0.6775 |       14 |
+| refiner_v6_p50_aug_busi-ddti-tn3k  |          0.8566 |           20 |           0.7    |       14 |
+| refiner_v6_ctrl_busi-ddti-tn3k     |          0.8564 |           24 |           0.6836 |       14 |
+| refiner_v6_C1C2_busi-ddti-tn3k     |          0.8561 |           18 |           0.6802 |       14 |
+| refiner_v3_A5_busi-ddti-tn3k       |          0.856  |           22 |           0.6836 |       14 |
+| refiner_v6_C3C4_busi-ddti-tn3k     |          0.855  |           24 |           0.6934 |       14 |
+| refiner_v6_C1C2C3C4_busi-ddti-tn3k |          0.8532 |           20 |           0.691  |       14 |
+| refiner_v5_mixA5_busi-ddti-tn3k    |          0.8521 |           18 |           0.6775 |       14 |
+| refiner_v2_A5_busi-ddti-tn3k       |          0.8521 |           18 |           0.6775 |       14 |
+| refiner_A5_busi-ddti-tn3k          |          0.8439 |           27 |           0.5676 |       11 |
+| refiner_smoke_busi                 |          0.7752 |            4 |           0.6311 |        5 |

@@ -1,15 +1,33 @@
-# 超声低回声目标分割：YOLO26n+Otsu+contour-refiner  vs  YOLO26n-seg —— 对比实验报告
+# 超声低回声目标分割：五条流水线对比实验报告
+
+> **YOLO26n + contour-refiner (A-box)** · **YOLO26n-seg (B)** · **+EdgeSAM** · **+EfficientSAM** · **+LiteMedSAM** · **+Swin-LiteMedSAM**  
+> 数据: BUSI(乳腺) + TN3K/DDTI(甲状腺)，另有 TG3K(腺体) 边界案例；同一数据划分、同一检测器、同一评估脚本。
 
 ## 0. 结论 (先看这里)
 
-0. **【最重要】把初始轮廓从"框内 Otsu 最大暗连通域"改为"检测框矩形"，方案 A 反超方案 B**：测试集 Dice **0.8028** vs 0.7923，HD95 持平 14.33px；检测命中目标上的轮廓命中率 86.5% → **99.3%**（oracle 上限 99.7%）。该改动不需要重训检测器或分割器，详见 §4.3。
+### 0.1 五条流水线总表（同一数据集/划分/检测器，测试集 200 张）
 
-1. **在完全相同的检测框条件下，方案 B (YOLO26n-seg) 更准**：测试集平均 Dice 0.7923 vs 方案 A (Otsu+contour-refiner) 0.6602，领先约 +0.1321；边界指标同样领先 (HD95 14.3px vs 16.8px)。
-2. **contour-refiner 本身是有效的**：在同样的检测框下，它把 Otsu 粗糙轮廓从 0.5410 提升到 0.6602 Dice (**+0.1192**)，失败率 (Dice<0.5) 从 33.8% 降到 23.0%。
-3. **方案 A 的瓶颈是检测框，而不是轮廓精细化**：把 YOLO 框换成 GT 框后，方案 A 达到 0.7808 Dice，几乎追平方案 B (0.7923)。二者差距 (+0.1321) 与"GT 框 vs YOLO 框"的差距 (+0.1206) 基本相同。
-4. **数据增强 A1–A5 在本实验中没有带来测试集收益**（A0 0.6768 → A5 0.6602，差异在噪声范围内），原因是该任务的主要误差来自检测框偏差而非轮廓初始化噪声；增强对验证集拟合有影响，但对测试集泛化帮助有限。
-5. **适用边界**：Otsu 针对"低回声"目标有效，对高回声结构（如 TG3K 甲状腺腺体）会失效；若目标与周围暗背景连成一片，还需要额外的初始化策略。
-![overall](final/fig_compare.png)
+| 流水线 | 参数量 | Dice ↑ | IoU ↑ | HD95 ↓ | ASSD ↓ | Dice<0.5 ↓ | 端到端 ms ↓ | FPS ↑ |
+|---|---|---|---|---|---|---|---|---|
+| B (YOLO26n-seg) | 3.13M | **0.7735** | 0.7040 | 15.93 | 5.10 | 13.4% | 9.72 | 102.8 |
+| YOLO26n+LiteMedSAM | 9.79M | **0.7715** | 0.7007 | 15.07 | 5.00 | 13.4% | 44.76 | 22.3 |
+| YOLO26n+EdgeSAM | 9.58M | **0.7648** | 0.6899 | 15.46 | 5.54 | 13.4% | 34.52 | 29.0 |
+| A-box (框+contour-refiner) | 0.47M | **0.7632** | 0.6842 | 16.30 | 6.12 | 12.9% | 15.96 | 62.7 |
+| YOLO26n+Swin-LiteMedSAM | 36.77M | **0.6000** | 0.5152 | 20.39 | 8.48 | 27.2% | 45.92 | 21.8 |
+
+> EdgeSAM / EfficientSAM 在同一训练集上微调 mask decoder；LiteMedSAM 用官方权重零样本；Swin-LiteMedSAM 因官方权重不可得而为本项目自训版本（见 §4.8）。
+
+### 0.2 关键结论
+
+0. **【最重要】把初始轮廓从"框内 Otsu 最大暗连通域"改为"检测框矩形"，方案 A 反超方案 B**：完整测试集 Dice **0.8028** vs 0.7923、HD95 持平 14.33px；检测命中目标上的轮廓命中率 86.5% → **99.3%**（oracle 上限 99.7%）。该改动不需要重训检测器或分割器，详见 §4.3。
+1. **contour-refiner 本身有效**：同一检测框下把 Otsu 粗糙轮廓从 **0.5410 → 0.8028**（换框初始化后）；即使仍用 Otsu 初始化也有 0.5410 → 0.6602 （+0.1192），失败率 33.8% → 23.0%。
+2. **瓶颈在初始化质量，不在精细化**：Otsu 初始轮廓的**真值覆盖率仅 0.718**（p10 = 0.301，常只圈住病灶一部分），框矩形覆盖率 **0.967**（p10 = 0.912）；refiner 只能局部修正，补不回未覆盖区域。详见 §4.5。
+3. **SAM 系必须做域适配**：零样本时 EfficientSAM Dice **0.0000**、EdgeSAM 0.6180；适配后 0.7682 / 0.7648。LiteMedSAM 零样本即 0.7715，是 SAM 系里最好的。但它们的端到端延迟是 B 的 3.5–10 倍。
+4. **A1–A5 增强与框形状增强都没有带来测试集收益**（差异 <0.02 且 95% CI 跨 0）；本实验 run-to-run 噪声约 **±0.004 Dice**，小于该幅度的差异不可信。详见 §3、§4.6。
+5. **输入尺寸 512 明显优于 256**：256 下检测召回 0.90 → 0.75、三种方案 Dice 掉 0.15–0.20，而速度只快 1.5–7.6ms。详见 §4.7。
+6. **适用边界**：Otsu 的"低回声"假设对高回声目标（TG3K 甲状腺腺体）失效（粗糙轮廓 Dice 0.12 → 改 polarity 后 0.43）。详见 §4.1。
+
+![overall](final/fig_acc_speed_five.png)
 
 ## 1. 实验设置
 
@@ -20,6 +38,8 @@
 * 评估：mask IoU≥0.5 贪心匹配；指标 Dice/IoU/HD95/ASSD/边界F1/面积相对误差。
 
 ## 2. 主结果 (测试集，330 张图 / 341 个目标)
+
+> 注: `A` / `A-0` 行为 **Otsu 初始化**的历史配置；**正式配置是 §4.3 的 `A-box`（框矩形初始化，Dice 0.8028）**。此处保留 Otsu 版本用于说明"初始化质量决定上限"。
 
 | 方法 | n | Dice ↑ | IoU ↑ | HD95(px) ↓ | ASSD(px) ↓ | 边界F1 ↑ | 面积相对误差 ↓ | Dice<0.5 占比 ↓ |
 |---|---|---|---|---|---|---|---|---|
@@ -112,6 +132,31 @@ Otsu 极性诊断（50 张，GT 框，仅测粗糙轮廓质量）：
 
 **结论**：目标回声极性反转时，固定的"低回声假设"会让方案 A 的初始轮廓几乎完全失效（0.12 → 0.43 Dice，仅靠改极性判断即可提升 3.6 倍）；而方案 B 的分割头在训练分布外同样直接失效（Dice=0，因为它从未见过腺体类别）。因此该场景下**两者都需要针对性训练**，不能据此判定优劣；但它明确了方案 A 的适用前提：**目标必须是相对周围组织的低回声区**。
 
+## 4.2 追加实验：把 contour-refiner 接到 YOLO26n-seg 之后 (B+refiner)
+
+把 B 的输出 mask 当作"粗糙轮廓"（重采样为 64 点）再喂给同一个 contour-refiner，其余条件完全不变。测试集结果：
+
+| 方法 | n | Dice ↑ | IoU ↑ | HD95(px) ↓ | ASSD(px) ↓ | 边界F1 ↑ | 面积误差 ↓ |
+|---|---|---|---|---|---|---|---|
+| B: YOLO26n-seg(端到端) | 337 | **0.7923** | 0.7191 | 14.33 | 4.62 | 0.4260 | 0.154 |
+| B+refiner: YOLO26n-seg mask→contour-refiner | 337 | **0.7813** | 0.7016 | 14.84 | 5.32 | 0.3652 | 0.155 |
+
+**结论：没有提升，反而下降 0.011 Dice。** 配对比较 (同 337 个预测目标)：Dice 0.7923 → 0.7813，58% 的目标变差、32% 变好。两条实测证据：
+
+1. **该 refiner 是为"粗糙轮廓"校准的**：把 GT 轮廓 (Dice 0.9954) 当作输入喂给它，输出 Dice 降到 0.9127（**100% 样本都变差**）。它的训练分布是"框→Otsu"粗糙轮廓（平均 Dice ≈ 0.54），学到的是"大幅修正"策略；面对本就准确的 seg mask 时属于分布外输入，修正量过大导致过修正。
+2. **B 的精度已高于该 refiner 的修正能力**：B 在有预测的目标上 Dice 中位数 0.90、p10 = 0.80；按质量分桶后，refiner 在**每一个**质量区间都是负收益（0.7–0.85 区间 −0.021，0.85–0.95 区间 −0.014，>0.95 区间 −0.022）。
+
+| 级联方式 | 测试集 Dice | 说明 |
+|---|---|---|
+| B: YOLO26n-seg 单独 | **0.7923** | 端到端，已含检测+轮廓 |
+| B + refiner（现有 Otsu 训练的 refiner） | 0.7813 | 分布外输入，过修正 |
+| A: 检测框 → Otsu → refiner | 0.6602 | 提升来自初始化质量 |
+| A: GT 框 → Otsu → refiner | 0.7808 | 接近 B，仍依赖初始轮廓 |
+
+**值得尝试的前提**：只有用**与 seg 输出同分布**的样本重训 refiner（以"seg mask + 轻微形变"作为粗糙轮廓，而非 Otsu 轮廓）才可能有小幅收益。理论上限有限：B 的分割误差中位数已 0.90，剩余误差主要来自 11% 的完全漏检 (Dice=0，属于检测问题，轮廓精细化无法修复)。要突破应改进检测/分类头，而非叠加轮廓回归。
+
+![b+refiner](B_plus_refiner/vis_bplusref_busi_c4322390d6.png)
+
 ## 4.3 漏检攻防：把"框矩形"作为初始轮廓（本实验的关键改进）
 
 ### 4.3.1 根因归因（GT 目标级，检测框 conf≥0.25，IoU≥0.5 记命中）
@@ -171,31 +216,6 @@ Otsu 极性诊断（50 张，GT 框，仅测粗糙轮廓质量）：
 2. **初始轮廓改为框矩形**（或"框矩形 + Otsu 择优"）：命中率 73.7% → 99.3%。
 3. 剩余误差中 Otsu/初始化只剩 0.3%（oracle 上限），**下一阶段的瓶颈回到检测器**：11–13% 的目标在 conf=0.25 下完全无框。
 4. 进阶（尚未做）：以更高分辨率训练检测器、加入困难负样本挖掘与更强 TTA、或把 refiner 的输出作为二次检测的候选框（迭代式框回归）。
-
-## 4.2 追加实验：把 contour-refiner 接到 YOLO26n-seg 之后 (B+refiner)
-
-把 B 的输出 mask 当作"粗糙轮廓"（重采样为 64 点）再喂给同一个 contour-refiner，其余条件完全不变。测试集结果：
-
-| 方法 | n | Dice ↑ | IoU ↑ | HD95(px) ↓ | ASSD(px) ↓ | 边界F1 ↑ | 面积误差 ↓ |
-|---|---|---|---|---|---|---|---|
-| B: YOLO26n-seg(端到端) | 337 | **0.7923** | 0.7191 | 14.33 | 4.62 | 0.4260 | 0.154 |
-| B+refiner: YOLO26n-seg mask→contour-refiner | 337 | **0.7813** | 0.7016 | 14.84 | 5.32 | 0.3652 | 0.155 |
-
-**结论：没有提升，反而下降 0.011 Dice。** 配对比较 (同 337 个预测目标)：Dice 0.7923 → 0.7813，58% 的目标变差、32% 变好。两条实测证据：
-
-1. **该 refiner 是为"粗糙轮廓"校准的**：把 GT 轮廓 (Dice 0.9954) 当作输入喂给它，输出 Dice 降到 0.9127（**100% 样本都变差**）。它的训练分布是"框→Otsu"粗糙轮廓（平均 Dice ≈ 0.54），学到的是"大幅修正"策略；面对本就准确的 seg mask 时属于分布外输入，修正量过大导致过修正。
-2. **B 的精度已高于该 refiner 的修正能力**：B 在有预测的目标上 Dice 中位数 0.90、p10 = 0.80；按质量分桶后，refiner 在**每一个**质量区间都是负收益（0.7–0.85 区间 −0.021，0.85–0.95 区间 −0.014，>0.95 区间 −0.022）。
-
-| 级联方式 | 测试集 Dice | 说明 |
-|---|---|---|
-| B: YOLO26n-seg 单独 | **0.7923** | 端到端，已含检测+轮廓 |
-| B + refiner（现有 Otsu 训练的 refiner） | 0.7813 | 分布外输入，过修正 |
-| A: 检测框 → Otsu → refiner | 0.6602 | 提升来自初始化质量 |
-| A: GT 框 → Otsu → refiner | 0.7808 | 接近 B，仍依赖初始轮廓 |
-
-**值得尝试的前提**：只有用**与 seg 输出同分布**的样本重训 refiner（以"seg mask + 轻微形变"作为粗糙轮廓，而非 Otsu 轮廓）才可能有小幅收益。理论上限有限：B 的分割误差中位数已 0.90，剩余误差主要来自 11% 的完全漏检 (Dice=0，属于检测问题，轮廓精细化无法修复)。要突破应改进检测/分类头，而非叠加轮廓回归。
-
-![b+refiner](B_plus_refiner/vis_bplusref_busi_c4322390d6.png)
 
 ## 4.4 第四条对照：YOLO26n + EdgeSAM / EfficientSAM（精度 + 推理速度）
 
@@ -368,25 +388,51 @@ Otsu 极性诊断（50 张，GT 框，仅测粗糙轮廓质量）：
 ## 5. 复现步骤
 
 ```bash
-PY=./.conda/bin/python            # 项目内 conda 环境 (.conda)
-PYTHONPATH=src $PY scripts/01_prepare_data.py            # 解压 + 配对 + 统一
-PYTHONPATH=src $PY scripts/02_make_splits.py             # 共享 train/val/test 划分
-PYTHONPATH=src $PY scripts/04_export_yolo.py             # 导出 YOLO det/seg 数据集
-PYTHONPATH=src $PY scripts/04b_make_subset.py            # 平衡子集 (2200 张)
-PYTHONPATH=src $PY scripts/05_train_yolo.py --kind det --yolo-dir data/yolo_subset \
+PY=./.conda/bin/python            # 项目内 conda 环境 (.conda, Python 3.11 + torch 2.11+cu128)
+export PYTHONPATH=src
+export YOLO_CONFIG_DIR=$PWD/.cache/ultralytics
+
+# 1) 数据准备
+$PY scripts/01_prepare_data.py      # 解压 + image/mask 配对 + 统一
+$PY scripts/02_make_splits.py       # 共享 70/15/15 划分 (seed=42)
+$PY scripts/04_export_yolo.py       # 导出 YOLO det/seg 数据集
+$PY scripts/04b_make_subset.py      # 平衡子集 (busi600/tn3k1000/ddti600)
+
+# 2) 训练 YOLO26n 检测器 (A/B/SAM 系共用) 与 YOLO26n-seg (方案 B)
+$PY scripts/05_train_yolo.py --kind det --yolo-dir data/yolo_subset \
     --name det_yolo26n_sub --epochs 60 --imgsz 512 --batch 16
-PYTHONPATH=src $PY scripts/05_train_yolo.py --kind seg --yolo-dir data/yolo_subset \
+$PY scripts/05_train_yolo.py --kind seg --yolo-dir data/yolo_subset \
     --name seg_yolo26n_sub --epochs 60 --imgsz 512 --batch 12
-PYTHONPATH=src $PY scripts/03b_cache_samples.py --level 5 --variants 3 \
-    --datasets busi tn3k ddti --out-subdir my_L5
-PYTHONPATH=src $PY scripts/03_train_refiner.py --level 5 --tag A5 \
-    --datasets busi tn3k ddti --cache-dir data/cache/my_L5 --epochs 25 --batch-size 64
-PYTHONPATH=src $PY scripts/07_evaluate.py --split test \
-    --uids-file data/yolo_subset/_subset_splits.csv \
-    --refiner runs/refiner_A5_busi-ddti-tn3k/best.pt \
-    --det runs/det_yolo26n_sub/weights/best.pt \
-    --seg runs/seg_yolo26n_sub/weights/best.pt --out reports/final_eval
+
+# 3) 方案 A: contour-refiner (先缓存样本, 再训练)
+$PY scripts/03b_cache_samples.py --level 5 --variants 3 --datasets busi tn3k ddti \
+    --out-subdir v5_mix_L5_v3
+$PY scripts/03c_verify_cache.py     # 缓存完整性校验
+$PY scripts/03_train_refiner.py --level 5 --tag A5 --datasets busi tn3k ddti \
+    --cache-dir data/cache/v5_mix_L5_v3 --epochs 25 --batch-size 64
+
+# 4) 五方案统一评测 (精度 + 速度, 同一 test split)
+$PY scripts/18_bench_sam.py --limit 200 --warmup 5 --repeats 2 \
+    --sam edgesam efficientvit-t litemedsam swin_litemedsam \
+    --sam-ckpt weights/sam_finetuned --out reports/bench_litemedsam
+$PY scripts/20_sam_compare.py        # 汇总表 + 精度-速度图
+
+# 5) 消融与专题实验
+$PY scripts/21_box_aug_experiments.py ; $PY scripts/22_box_aug_report.py
+$PY scripts/23_box_aug_stats.py      # 配对 bootstrap 显著性检验
+$PY scripts/24_input_size_bench.py --sizes 512 256 --limit 120
+$PY scripts/25_input_size_report.py
+
+# 6) 生成本报告
+$PY scripts/14_final_report.py       # -> reports/REPORT.md
+
+# 可选: SAM 系适配 (复现 SAM 变体结果)
+$PY scripts/19_finetune_sam.py --variant edgesam --epochs 4 --lr 5e-4
+$PY scripts/19_finetune_sam.py --variant efficientvit-t --epochs 4 --lr 5e-4
+$PY scripts/26_train_swin_litemedsam.py --epochs 8 --stride 3
 ```
+
+> 完整脚本清单与踩坑记录见 [`EXPERIMENT.md`](../EXPERIMENT.md) §8/§7。
 
 ## 6. 局限与后续改进
 
