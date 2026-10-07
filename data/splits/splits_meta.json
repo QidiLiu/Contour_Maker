@@ -1,10 +1,20 @@
 {
   "seed": 42,
-  "val": 0.15,
-  "test": 0.15,
+  "fractions": {
+    "train": 0.7,
+    "val": 0.15,
+    "test": 0.15
+  },
+  "num_classes": 4,
+  "class_names": [
+    "breast_benign",
+    "breast_malignant",
+    "thyroid_nodule",
+    "thyroid_gland"
+  ],
   "counts": {
-    "test": 1255,
-    "train": 5852,
-    "val": 1255
+    "train": 5850,
+    "val": 1256,
+    "test": 1256
   }
 }
