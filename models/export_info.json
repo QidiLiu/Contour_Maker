@@ -1,0 +1,12 @@
+{
+  "imgsz": 512,
+  "opset": 12,
+  "num_classes": 4,
+  "class_names": [
+    "breast_benign",
+    "breast_malignant",
+    "thyroid_nodule",
+    "thyroid_gland"
+  ],
+  "nms": "cxx-side"
+}

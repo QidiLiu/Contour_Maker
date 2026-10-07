@@ -98,16 +98,19 @@ def main() -> int:
     t_total = 0.0
 
     for n, (_, r) in enumerate(df.iterrows(), start=1):
-        img = cv2.imread(str(UNIFIED / r.image), cv2.IMREAD_GRAYSCALE)
-        gt = cv2.imread(str(UNIFIED / r.mask), cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(str(UNIFIED / r["image"]), cv2.IMREAD_GRAYSCALE)
+        gt = cv2.imread(str(UNIFIED / r["mask"]), cv2.IMREAD_GRAYSCALE)
         if img is None or gt is None:
             continue
         h, w = img.shape[:2]
         gts = _gt_targets(gt)
 
         t0 = time.perf_counter()
-        canvas, ratio, pad = letterbox_simple(img, args.imgsz)
-        res = model.predict(canvas, conf=args.conf, imgsz=args.imgsz,
+        # 直接把原图交给 ultralytics，让它自己做 letterbox / 反变换。
+        # 关键: retina_masks=True 时 masks.xy 是「喂进去的图像」的坐标；
+        # 若先自行 letterbox 再把结果当原图坐标用，坐标会整体错位（检测全废）。
+        img3 = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        res = model.predict(img3, conf=args.conf, imgsz=args.imgsz,
                             verbose=False, device=device, iou=args.iou,
                             retina_masks=True)
         rr = res[0]
@@ -129,14 +132,14 @@ def main() -> int:
 
         gt_masks = [g["mask"] for g in gts]
         pairs, n_miss, n_fp = greedy_match(pred_masks, gt_masks, IOU_MATCH_THRESHOLD)
-        det_records.append(dict(uid=r.uid, dataset=r.dataset, split=r.split,
+        det_records.append(dict(uid=r["uid"], dataset=r["dataset"], split=r["split"],
                                 n_gt=len(gts), n_pred=len(pred_masks),
                                 n_miss=n_miss, n_fp=n_fp))
         for pi, gi, miou in pairs:
-            rec = dict(uid=r.uid, dataset=r.dataset, split=r.split,
-                       modality=r.modality, match_iou=miou,
-                       pred_cls=pred_cls[pi], gt_cls=int(r.class_id),
-                       cls_ok=int(pred_cls[pi] == int(r.class_id)))
+            rec = dict(uid=r["uid"], dataset=r["dataset"], split=r["split"],
+                       modality=r["modality"], match_iou=miou,
+                       pred_cls=pred_cls[pi], gt_cls=int(r["class_id"]),
+                       cls_ok=int(pred_cls[pi] == int(r["class_id"])))
             rec.update(evaluate_pair(pred_masks[pi], gt_masks[gi],
                                      BOUNDARY_F1_TOL))
             records.append(rec)
@@ -149,7 +152,7 @@ def main() -> int:
             for ct in pred_contours:
                 cv2.polylines(vis, [np.round(ct).astype(np.int32)], True,
                               (255, 0, 255), 1)
-            cv2.imwrite(str(out_dir / f"vis_{r.dataset}_{r.uid}.png"), vis)
+            cv2.imwrite(str(out_dir / f"vis_{r['dataset']}_{r['uid']}.png"), vis)
             vis_saved += 1
 
         if n % 200 == 0:

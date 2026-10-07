@@ -80,10 +80,19 @@ def export_yolo(weights: Path, out: Path, imgsz: int, opset: int, kind: str):
     model.export(format="onnx", imgsz=imgsz, opset=opset,
                  simplify=False, dynamic=False, nms=False,
                  half=False, device="cpu")
+    # ultralytics 把 onnx 写在权重同目录且与权重同名（best.pt -> best.onnx）。
+    # 按 stem 精确定位，再兜底 glob。
     produced = out.with_suffix(".onnx") if out.suffix != ".onnx" else out
-    src = Path(weights).parent.parent.parent / "yolo26n.onnx"
-    if src.exists() and src.resolve() != produced.resolve():
-        src.replace(produced)
+    for c in (Path(weights).with_suffix(".onnx"), Path(weights).parent / "best.onnx"):
+        if c.exists() and c.resolve() != produced.resolve():
+            c.replace(produced)
+            break
+    if not produced.exists():
+        found = sorted(Path(weights).parent.glob("*.onnx"))
+        if found:
+            found[0].replace(produced)
+    if not produced.exists():
+        raise FileNotFoundError(f"未找到导出的 ONNX（权重目录 {Path(weights).parent}）")
     print(f"[{kind:5s}] -> {produced}")
     return produced
 

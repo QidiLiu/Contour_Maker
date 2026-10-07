@@ -55,15 +55,24 @@ def main() -> int:
         device="cpu",
     )
 
-    # ultralytics 会把 onnx 写到 weights 的上级目录，统一搬到 out_dir
-    produced = Path(args.seg).parent.parent.parent / "yolo26n-seg.onnx"
-    if produced.exists() and produced.resolve() != target.resolve():
-        produced.replace(target)
+    # ultralytics 把 onnx 写在权重同目录且与权重同名（best.pt -> best.onnx）。
+    # 按 stem 精确定位，再兜底 glob，最后统一搬到 out_dir。
+    cands = [Path(args.seg).with_suffix(".onnx"),
+             Path(args.seg).parent / "best.onnx"]
+    moved = False
+    for c in cands:
+        if c.exists() and c.resolve() != target.resolve():
+            c.replace(target)
+            moved = True
+            break
+    if not moved and not target.exists():
+        found = sorted(Path(args.seg).parent.glob("*.onnx")) or sorted(out_dir.glob("*.onnx"))
+        if found:
+            found[0].replace(target)
 
     if not target.exists():
-        cand = list(out_dir.glob("*seg*.onnx")) or list(out_dir.glob("*.onnx"))
-        if cand:
-            cand[0].replace(target)
+        print(f"[error] 未找到导出的 ONNX，请检查 ultralytics 输出目录", file=sys.stderr)
+        return 1
 
     print(f"[done] -> {target}")
     (out_dir / "export_info.json").write_text(json.dumps(dict(

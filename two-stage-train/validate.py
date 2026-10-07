@@ -152,8 +152,8 @@ def main() -> int:
     t_det = t_seg = 0.0
 
     for n, (_, r) in enumerate(df.iterrows(), start=1):
-        img = cv2.imread(str(UNIFIED / r.image), cv2.IMREAD_GRAYSCALE)
-        gt = cv2.imread(str(UNIFIED / r.mask), cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(str(UNIFIED / r["image"]), cv2.IMREAD_GRAYSCALE)
+        gt = cv2.imread(str(UNIFIED / r["mask"]), cv2.IMREAD_GRAYSCALE)
         if img is None or gt is None:
             continue
         h, w = img.shape[:2]
@@ -211,14 +211,14 @@ def main() -> int:
         # ---- 评估（mask IoU 贪心匹配）
         gt_masks = [g["mask"] for g in gts]
         pairs, n_miss, n_fp = greedy_match(pred_masks, gt_masks, IOU_MATCH_THRESHOLD)
-        det_records.append(dict(uid=r.uid, dataset=r.dataset, split=r.split,
+        det_records.append(dict(uid=r["uid"], dataset=r["dataset"], split=r["split"],
                                 n_gt=len(gts), n_pred=len(pred_masks),
                                 n_miss=n_miss, n_fp=n_fp))
         for pi, gi, miou in pairs:
-            rec = dict(uid=r.uid, dataset=r.dataset, split=r.split,
-                       modality=r.modality, match_iou=miou,
-                       pred_cls=pred_cls[pi], gt_cls=int(r.class_id),
-                       cls_ok=int(pred_cls[pi] == int(r.class_id)))
+            rec = dict(uid=r["uid"], dataset=r["dataset"], split=r["split"],
+                       modality=r["modality"], match_iou=miou,
+                       pred_cls=pred_cls[pi], gt_cls=int(r["class_id"]),
+                       cls_ok=int(pred_cls[pi] == int(r["class_id"])))
             rec.update(evaluate_pair(pred_masks[pi], gt_masks[gi],
                                      BOUNDARY_F1_TOL))
             records.append(rec)
@@ -231,7 +231,7 @@ def main() -> int:
             for ct in pred_contours:
                 cv2.polylines(vis, [np.round(ct).astype(np.int32)], True,
                               (255, 0, 255), 1)
-            cv2.imwrite(str(out_dir / f"vis_{r.dataset}_{r.uid}.png"), vis)
+            cv2.imwrite(str(out_dir / f"vis_{r['dataset']}_{r['uid']}.png"), vis)
             vis_saved += 1
 
         if n % 200 == 0:
