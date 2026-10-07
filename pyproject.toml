@@ -5,10 +5,13 @@ description = "Ultrasound lesion contour segmentation: YOLO26n+MK-UNet (two-stag
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 
-# 训练/验证依赖。torch/torchvision 走 cu128 index, 由 uv 的 tool.uv 配置提供。
+# 训练/验证依赖。
+# 实测: Python 3.11 + torch 2.14.1+cu130 + ultralytics 8.4.174 (RTX 4060 Ti)。
+# 注意: 官方 cu128 索引在 cp311 + torch>=2.7 下没有可用 wheel，
+#       直接用 PyPI 默认源即可获得带 CUDA 的构建, 因此这里不指定额外索引。
 dependencies = [
-    "torch>=2.6,<2.12",
-    "torchvision>=0.21,<0.27",
+    "torch>=2.6",
+    "torchvision>=0.21",
     "ultralytics>=8.4.0",
     "numpy>=1.26,<2.2",
     "opencv-python-headless>=4.9",
@@ -20,27 +23,17 @@ dependencies = [
     "pyyaml>=6.0",
     "albumentations>=1.4",
     "tabulate>=0.9",
+    "requests>=2.31",
     "onnx>=1.16",
     "onnxruntime>=1.18",
     "onnxslim>=0.1",
-    "huggingface-hub>=0.24",
+    "onnxscript>=0.1",     # torch>=2.14 的 dynamo ONNX 导出器依赖
 ]
 
 [dependency-groups]
 dev = [
     "ruff>=0.6",
 ]
-
-[tool.uv]
-# torch/torchvision 的 CUDA 构建不在 PyPI 默认索引, 单独指定。
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu128" }
-torchvision = { index = "pytorch-cu128" }
 
 [tool.ruff]
 line-length = 100

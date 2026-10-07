@@ -63,6 +63,16 @@
 
 ## 注意事项
 
-ultralytics 的分割头（mask prototype + 实例系数 + NMS）在 ONNX 导出时结构较复杂，
-部分版本需要关闭内置 NMS（`nms=False`），在 C++ 侧自行做 NMS 与掩码组合，
-以保证与 Python 侧口径一致。`export_onnx.py` 已按此配置导出。
+YOLO26-seg 的头部（`Segment26`）**自带 TopK 选择**，因此 ONNX 导出既不是
+「纯 logits」也不是标准的 YOLOv8 三输出，而是**两个输出**：
+
+```
+images  (1, 3, 512, 512)          # 3 通道（ultralytics 以 BGR 读图）
+output0 (1, 300, 38)              # [x1,y1,x2,y2, score, class_id, coeff×32]
+                                  #  已按 score 降序，未做 NMS
+output1 (1, 32, 128, 128)         # 32 个掩码原型
+```
+
+`export_onnx.py` 以 `nms=False, dynamic=False` 导出，NMS 与
+YOLACT 式掩码组合（`protos × coeffs`，框内裁剪）都放在 C++ 侧实现，
+以保证两侧口径一致。详见 `one-stage-test/README.md`。

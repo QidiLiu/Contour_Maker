@@ -8,12 +8,16 @@
     <out>/index.csv                 # uid, target_idx, src, box, ...
 
 用法:
-    # 训练集用 GT 框（干净初始化）
-    python build_roi_dataset.py --box-source gt --splits train val --out ../data/roi_cache/train_gt
+    # 训练集用检测框（匹配推理分布）
+    python build_roi_dataset.py --box-source det \
+        --det ../runs/det_yolo26n/weights/best.pt \
+        --splits train --out ../data/roi_cache/train
 
-    # 或用检测框（匹配推理分布）
-    python build_roi_dataset.py --det ../runs/det_yolo26n/weights/best.pt \
-        --box-source det --splits train --out ../data/roi_cache/train_det
+    # 验证集用 GT 框（干净、稳定）
+    python build_roi_dataset.py --box-source gt \
+        --splits val --out ../data/roi_cache/val
+
+注意: 每次运行都会重写 <out>/index.csv，不同 split 必须写到不同目录。
 """
 from __future__ import annotations
 

@@ -46,26 +46,36 @@
 
 输出 `runs/det_yolo26n/weights/best.pt`。
 
-### 2. 导出 ROI 训练集
+### 2. 构建 ROI 数据集
 
-以 GT 框（或检测框）为引导裁剪 ROI，生成 MK-UNet 的训练对。
+以检测框（或 GT 框）为引导裁剪 ROI，生成 MK-UNet 的训练对。
 
 ```bash
+# 训练集：用检测框，让 MK-UNet 见到推理时的真实框噪声分布
 .venv/bin/python build_roi_dataset.py \
+    --splits train --box-source det \
     --det ../runs/det_yolo26n/weights/best.pt \
-    --splits train val \
-    --box-source gt        # gt | det  （gt 用于训练, det 用于匹配推理分布）
-    --out ../data/roi_cache/train_gt
+    --out ../data/roi_cache/train
+
+# 验证集：用 GT 框（干净、稳定，便于模型选择）
+.venv/bin/python build_roi_dataset.py \
+    --splits val --box-source gt \
+    --out ../data/roi_cache/val
 ```
 
-`--box-source det` 时需要真实检测框，才能让 MK-UNet 见到推理时的框噪声分布。
+> `--box-source det` 需要 `--det` 指定检测权重；`gt` 模式不需要。
+> 注意两者要写到**不同目录**——`build_roi_dataset.py` 每次都会重写
+> `index.csv`，写到同一目录会覆盖上一次的结果。
+>
+> 训练用 det 框、验证用 GT 框会让 `val_dice` 偏乐观（GT 框更干净）。
+> 若要严格反映推理表现，验证集也应改用 `--box-source det`。
 
 ### 3. 训练 MK-UNet
 
 ```bash
 .venv/bin/python train_mkunet.py \
-    --data ../data/roi_cache/train_gt \
-    --val-data ../data/roi_cache/val_gt \
+    --data ../data/roi_cache/train \
+    --val-data ../data/roi_cache/val \
     --variant MK_UNet --roi-size 256 \
     --epochs 60 --batch 16 \
     --name mkunet_yolo26n
@@ -91,9 +101,12 @@
     --out ../models
 ```
 
-产出 `models/yolo26n_det.onnx` 与 `models/mkunet.onnx`，供 `two-stage-test/` 用 MNNConvert 转换。
+产出 `models/yolo26n_det.onnx` 与 `models/mkunet.onnx`，
+供 `two-stage-test/` 用 MNNConvert 转成 `.mnn`（转换命令见根 README「构建 MNNConvert」）。
 
 ## 依赖
 
 见根目录 `pyproject.toml`（uv 管理）。本子项目不额外引入 MK-UNet 官方依赖：
-`common/mkunet.py` 是 vendor 自 [SLDGroup/MK-UNet](https://github.com/SLDGroup/MK-UNet) 并移除了 `timm` 依赖的重实现，许可证见 `common/mkunet.LICENSE`。
+`common/mkunet.py` 是 vendor 自 [SLDGroup/MK-UNet](https://github.com/SLDGroup/MK-UNet)
+并移除了 `timm` 依赖的重实现（官方 README 提到的 `mmcv-full` 实际未被其代码使用）。
+官方仓库为 MIT 许可，本项目仅重实现网络结构，未复制其训练脚本。

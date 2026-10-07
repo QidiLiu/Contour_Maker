@@ -4,9 +4,8 @@
 输出是该 ROI 内的前景/背景二值掩码。
 
 用法:
-    python train_mkunet.py --data ../data/roi_cache/train_gt \
-        --val-data ../data/roi_cache/val_gt \
-        --epochs 60 --batch 16 --name mkunet_yolo26n
+    python train_mkunet.py --data ../data/roi_cache/train \
+        --val-data ../data/roi_cache/val --epochs 60 --batch 16
 """
 from __future__ import annotations
 

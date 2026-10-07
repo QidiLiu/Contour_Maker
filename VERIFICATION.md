@@ -142,8 +142,19 @@ NVIDIA 在 WSL2 下仅透传 CUDA。
 ## 7. 环境不稳定性说明
 
 会话期间服务端多次重启，导致：
-- 训练进程被中断（seg 停在 50/60；det 未开始）
+- 单阶段训练被中断（seg 停在 **50/60** epoch，非完整 60）
 - `tmux` 会话与 `/tmp/opencode` 被清空
 
-因此本记录中的单阶段结果来自**已落盘的 best.pt**，两阶段训练需重新执行。
-建议用 `scripts/run_all.sh` 在稳定环境下一气跑完。
+处理方式：
+- 单阶段结果取自**已落盘的 best.pt**（50 epoch，mAP50=0.865），指标有效
+- 两阶段改用 `tmux` 托管后**已完整跑完**（det 60/60，MK-UNet 60/60）
+- 为此新增了 `scripts/train_bg.sh`（tmux 托管长训练）
+
+若需补齐单阶段的最后 10 epoch：
+
+```bash
+./scripts/train_bg.sh seg        # 从 runs/seg_yolo26n/weights/last.pt 续训
+```
+
+`seg` 任务已在脚本中配置为 `resume=True`，会自动从 `last.pt` 恢复
+（含优化器状态与 epoch 计数）。

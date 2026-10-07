@@ -33,9 +33,24 @@ cd two-stage-train
     --out ../models
 cd ..
 
-MNNConvert -f ONNX --modelFile models/yolo26n_det.onnx --MNNModel models/yolo26n_det.mnn
-MNNConvert -f ONNX --modelFile models/mkunet.onnx     --MNNModel models/mkunet.mnn
+MC=build/mnn-conv/MNNConvert        # 构建方式见根 README「构建 MNNConvert」
+$MC -f ONNX --modelFile models/yolo26n_det.onnx --MNNModel models/yolo26n_det.mnn
+$MC -f ONNX --modelFile models/mkunet.onnx      --MNNModel models/mkunet.mnn
 ```
+
+> `models/yolo26n_det.mnn` 与 `models/mkunet.mnn` 已随仓库提供，可直接跳到「运行」。
+
+### 模型接口（C++ 侧解析依据）
+
+| 模型 | 输入 | 输出 |
+|---|---|---|
+| `yolo26n_det.mnn` | `images` (1,**3**,512,512) | `output0` (1,300,6) = `[x1,y1,x2,y2,score,class_id]` |
+| `mkunet.mnn` | `input` (1,**1**,256,256) | `logits` (1,1,256,256) |
+
+- 检测模型输入是 **3 通道**（ultralytics 以 BGR 读图）；C++ 侧把灰度复制到 3 通道。
+- 检测输出为**合并式**：头部自带 TopK 并按分数降序，**未做 NMS**，
+  C++ 侧按类别独立补 NMS。坐标为 letterbox 空间 xyxy。
+- MK-UNet 输入是**单通道**灰度 ROI；输出 logits 经 sigmoid 后按 `--thr` 二值化。
 
 ## 运行
 

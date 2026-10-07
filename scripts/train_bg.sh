@@ -32,7 +32,7 @@ EOF
     ;;
     mkunet) cat <<EOF
 cd $ROOT/two-stage-train && exec $PY train_mkunet.py \\
-  --data $ROOT/data/roi_cache/train_gt --val-data $ROOT/data/roi_cache/val_gt \\
+  --data $ROOT/data/roi_cache/train --val-data $ROOT/data/roi_cache/val \\
   --variant MK_UNet --roi-size 256 --epochs \${MKUNET_EPOCHS:-60} --batch 16 \\
   --name mkunet_yolo26n
 EOF

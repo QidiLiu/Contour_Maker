@@ -15,16 +15,18 @@ cmake --build build -j
 ## 准备模型
 
 ```bash
-# 1) 训练子项目导出 ONNX（nms=False，NMS 交给 C++ 侧）
+# 1) 训练子项目导出 ONNX
 cd one-stage-train
 ../.venv/bin/python export_onnx.py --seg ../runs/seg_yolo26n/weights/best.pt --out ../models
 
 # 2) ONNX -> MNN
 cd ..
-MNNConvert -f ONNX --modelFile models/yolo26n_seg.onnx --MNNModel models/yolo26n_seg.mnn
+build/mnn-conv/MNNConvert -f ONNX \
+    --modelFile models/yolo26n_seg.onnx --MNNModel models/yolo26n_seg.mnn
 ```
 
-> MNNConvert 的构建方式见根 README。
+> MNNConvert 的构建方式见根 README「构建 MNNConvert」。
+> `models/yolo26n_seg.mnn` 已随仓库提供，可直接跳到「运行」。
 
 ## 运行
 
@@ -70,10 +72,20 @@ MNNConvert -f ONNX --modelFile models/yolo26n_seg.onnx --MNNModel models/yolo26n
 
 ## 实现要点
 
-- 分割头输出由 **形状识别**（而非顺序假设）定位：`4 维 = protos`、
-  `3 维且通道数 ≥ 4+nc = det`、其余 `3 维 = coeffs`。
-- NMS 由 C++ 侧实现（`cxx-common/src/postprocess.cpp`），`YoloDetOut::indices`
-  记录保留的**原始输出索引**，用于把每实例掩码系数对齐到解码后的实例顺序。
-- 掩码按 YOLACT 方式组合（`protos × coeffs`），只在框内区域计算以省时间。
+- **输出解析**：按维度区分 `output0`(3 维, 解码结果) 与 `output1`(4 维, 掩码原型)，
+  不依赖输出顺序。`output0` 逐行为
+  `[x1,y1,x2,y2, score, class_id, coeff×32]`（letterbox 空间 xyxy）。
+- **NMS**：头部虽自带 TopK，但同一框会跨类别重复出现，故 C++ 侧仍按类别独立做
+  NMS（`--nms-iou`）。
+- **掩码组合**：按 YOLACT 方式 `coeff · protos`，只在框内区域计算以省时间；
+  原型网格 (128×128) 上的结果二值化（`> 0`）后，最近邻放到原图框区域，
+  再取最大连通域（`--min-area` 过滤）。
+- **输入**：模型要求 3 通道，C++ 侧把灰度 letterbox 结果复制到 3 个通道。
 - 图像 IO 用自带的最小 PNG 编解码器（`cxx-common/src/png.cpp`），
   已验证与 OpenCV 逐字节一致。
+
+## 与 Python 侧的差异
+
+C++ 与 Python（`one-stage-train/validate.py`）在同一测试子集上 F1 相差 0.003、
+Dice 相差约 0.02。残余差异来自 NMS 实现细节与掩码上采样插值
+（Python 用 ultralytics 的双线性，C++ 用最近邻）。

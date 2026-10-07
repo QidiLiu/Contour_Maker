@@ -13,7 +13,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PY="$ROOT/.venv/bin/python"
-MNN_CONVERT="${MNN_CONVERT:-MNNConvert}"
+# MNNConvert 默认取本项目构建的产物；也可用 MNN_CONVERT 环境变量覆盖
+MNN_CONVERT="${MNN_CONVERT:-$ROOT/build/mnn-conv/MNNConvert}"
 STAGE="${1:-all}"
 JOBS="${JOBS:-8}"
 
@@ -57,13 +58,15 @@ do_train_det() {
 do_train_mkunet() {
   say "构建 ROI 数据集 + 训练 MK-UNet"
   cd "$ROOT/two-stage-train"
-  "$PY" build_roi_dataset.py --splits train --box-source gt \
-      --out "$ROOT/data/roi_cache/train_gt"
+  # 训练集用检测框（匹配推理分布）；验证集用 GT 框（干净、稳定）
+  "$PY" build_roi_dataset.py --splits train --box-source det \
+      --det "$ROOT/runs/det_yolo26n/weights/best.pt" \
+      --out "$ROOT/data/roi_cache/train"
   "$PY" build_roi_dataset.py --splits val --box-source gt \
-      --out "$ROOT/data/roi_cache/val_gt"
+      --out "$ROOT/data/roi_cache/val"
   "$PY" train_mkunet.py \
-      --data "$ROOT/data/roi_cache/train_gt" \
-      --val-data "$ROOT/data/roi_cache/val_gt" \
+      --data "$ROOT/data/roi_cache/train" \
+      --val-data "$ROOT/data/roi_cache/val" \
       --variant MK_UNet --roi-size 256 \
       --epochs "${MKUNET_EPOCHS:-60}" --batch 16 \
       --name mkunet_yolo26n 2>&1 | tee "$ROOT/logs/train_mkunet.log"
@@ -102,10 +105,7 @@ do_export() {
   cd "$ROOT"
 
   say "ONNX -> MNN"
-  command -v "$MNN_CONVERT" >/dev/null || {
-    echo "[error] 找不到 $MNN_CONVERT，请设置 MNN_CONVERT 环境变量或加入 PATH" >&2
-    exit 1
-  }
+  do_mnnconvert
   "$MNN_CONVERT" -f ONNX --modelFile "$ROOT/models/yolo26n_seg.onnx" \
       --MNNModel "$ROOT/models/yolo26n_seg.mnn"
   "$MNN_CONVERT" -f ONNX --modelFile "$ROOT/models/yolo26n_det.onnx" \
@@ -120,6 +120,18 @@ do_build() {
   cmake -S "$ROOT" -B "$ROOT/build" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DMNN_OPENCL=ON
   cmake --build "$ROOT/build" -j "$JOBS"
+}
+
+do_mnnconvert() {
+  # MNNConvert 默认不编译（MNN_BUILD_CONVERTER 默认 OFF），且需用 MNN 自带 protobuf
+  if [ ! -x "$MNN_CONVERT" ]; then
+    say "构建 MNNConvert"
+    cmake -S "$ROOT/third_party/MNN" -B "$ROOT/build/mnn-conv" -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release -DMNN_OPENCL=ON \
+          -DMNN_BUILD_PROTOBUFFER=ON -DMNN_BUILD_CONVERTER=ON \
+          -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_WIN_RUNTIME_MT=ON
+    cmake --build "$ROOT/build/mnn-conv" --target MNNConvert -j "$JOBS"
+  fi
 }
 
 do_test() {
