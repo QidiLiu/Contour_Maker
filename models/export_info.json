@@ -1,12 +1,10 @@
 {
   "imgsz": 512,
   "opset": 12,
-  "num_classes": 4,
-  "class_names": [
-    "breast_benign",
-    "breast_malignant",
-    "thyroid_nodule",
-    "thyroid_gland"
-  ],
-  "nms": "cxx-side"
+  "nms_iou": 0.7,
+  "mkunet": {
+    "variant": "MK_UNet",
+    "params": 326693,
+    "roi_size": 256
+  }
 }

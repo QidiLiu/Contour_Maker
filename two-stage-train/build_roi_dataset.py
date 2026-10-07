@@ -100,13 +100,16 @@ def det_boxes_for_image(model, img_path: Path, conf: float, imgsz: int, device: 
             for b, c, s in zip(xyxy, cls, confs)]
 
 
-def match_box_to_target(det_box, gt_box, shape, min_iou: float = 0.3):
-    """把检测框匹配到 GT 目标（按 IoU 最大）。返回 gt 索引或 None。"""
-    best, best_i = None, min_iou
-    for i, (_comp, gb) in enumerate(gt_box):
+def match_box_to_target(det_box, gt_boxes, shape, min_iou: float = 0.3):
+    """把检测框匹配到 GT 目标（按 IoU 最大）。返回 gt 索引或 None。
+
+    gt_boxes: [(x1,y1,x2,y2), ...]
+    """
+    best, best_iou = None, min_iou
+    for i, gb in enumerate(gt_boxes):
         iou = _iou_xyxy(det_box, gb)
-        if iou >= best_i:
-            best, best_i = i, iou
+        if iou >= best_iou:
+            best, best_iou = i, iou
     return best
 
 

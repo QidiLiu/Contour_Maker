@@ -19,12 +19,14 @@ using namespace cxxcommon;
 namespace twostage {
 namespace {
 
-// 检测头输出: (1, 4+nc, N) CHW，或 (N, 4+nc) NCHW
+// YOLO26-det 的 ONNX 导出：
+//   output0: (1, N, 6)  每行 = [x1, y1, x2, y2, score, class_id]
+//            N = max_det(300)，已按 score 降序（头部自带 TopK），未做 NMS
+//            坐标为 letterbox 空间 xyxy
 struct DetHead {
-  std::vector<float> boxes;    // (N,4) cx,cy,w,h
-  std::vector<float> scores;
-  std::vector<int> classes;
+  const float* rows = nullptr;   // (N, cols)
   int N = 0;
+  int cols = 0;
 };
 
 bool ParseDetHead(const std::vector<int>& shape, const float* data, int num_classes,
@@ -33,60 +35,19 @@ bool ParseDetHead(const std::vector<int>& shape, const float* data, int num_clas
     *err = "检测模型无输出";
     return false;
   }
-  if (shape.size() == 3) {
-    // (1, C, N) CHW
-    const int C = shape[1], N = shape[2];
-    if (C < 4 + num_classes) {
-      *err = "det 通道数不足: " + std::to_string(C) + " < " +
-             std::to_string(4 + num_classes);
-      return false;
-    }
-    o->N = N;
-    o->boxes.resize(static_cast<size_t>(N) * 4);
-    o->scores.resize(N);
-    o->classes.resize(N);
-    for (int i = 0; i < N; ++i) {
-      for (int k = 0; k < 4; ++k) {
-        o->boxes[static_cast<size_t>(i) * 4 + k] =
-            data[static_cast<size_t>(k) * N + i];
-      }
-      int best = 0;
-      float bestv = data[static_cast<size_t>(4) * N + i];
-      for (int c = 1; c < num_classes; ++c) {
-        const float v = data[static_cast<size_t>(4 + c) * N + i];
-        if (v > bestv) { bestv = v; best = c; }
-      }
-      o->classes[i] = best;
-      o->scores[i] = bestv;
-    }
-    return true;
+  if (shape.size() != 3) {
+    *err = "检测输出应为 3 维 (1,N,C)，实际维度 " + std::to_string(shape.size());
+    return false;
   }
-  if (shape.size() == 2) {
-    // (N, C)
-    const int N = shape[0], C = shape[1];
-    if (C < 4 + num_classes) {
-      *err = "det 通道数不足: " + std::to_string(C);
-      return false;
-    }
-    o->N = N;
-    o->boxes.resize(static_cast<size_t>(N) * 4);
-    o->scores.resize(N);
-    o->classes.resize(N);
-    for (int i = 0; i < N; ++i) {
-      const float* r = data + static_cast<size_t>(i) * C;
-      for (int k = 0; k < 4; ++k) o->boxes[static_cast<size_t>(i) * 4 + k] = r[k];
-      int best = 0;
-      float bestv = r[4];
-      for (int c = 1; c < num_classes; ++c) {
-        if (r[4 + c] > bestv) { bestv = r[4 + c]; best = c; }
-      }
-      o->classes[i] = best;
-      o->scores[i] = bestv;
-    }
-    return true;
+  o->N = shape[1];
+  o->cols = shape[2];
+  o->rows = data;
+  if (o->cols < 6) {
+    *err = "检测输出列数 " + std::to_string(o->cols) + " < 6 (box4+score+class)";
+    return false;
   }
-  *err = "无法识别的检测输出形状，维度 " + std::to_string(shape.size());
-  return false;
+  (void)num_classes;
+  return true;
 }
 
 }  // namespace
@@ -105,14 +66,19 @@ std::vector<Instance> InferTwoStage(MnnRunner* det, MnnRunner* mk, const Config&
   // ================= 第一级：YOLO26n 检测 =================
   LetterboxInfo lb;
   const Image canvas = Letterbox(img, cfg.det_imgsz, &lb);
-  std::vector<float> din(static_cast<size_t>(cfg.det_imgsz) * cfg.det_imgsz);
+  // 检测模型输入为 3 通道（ultralytics 以 BGR 读图）。灰度复制到 3 通道即可。
+  const size_t det_plane = static_cast<size_t>(cfg.det_imgsz) * cfg.det_imgsz;
+  std::vector<float> din(det_plane * 3);
   for (int y = 0; y < cfg.det_imgsz; ++y) {
     for (int x = 0; x < cfg.det_imgsz; ++x) {
-      din[static_cast<size_t>(y) * cfg.det_imgsz + x] =
-          static_cast<float>(canvas.at(y, x)[0]) / 255.f;
+      const float v = static_cast<float>(canvas.at(y, x)[0]) / 255.f;
+      const size_t i = static_cast<size_t>(y) * cfg.det_imgsz + x;
+      din[i] = v;
+      din[det_plane + i] = v;
+      din[2 * det_plane + i] = v;
     }
   }
-  if (!det->Forward(din.data(), {1, 1, cfg.det_imgsz, cfg.det_imgsz}, err)) {
+  if (!det->Forward(din.data(), {1, 3, cfg.det_imgsz, cfg.det_imgsz}, err)) {
     return out;
   }
   if (t) t->det_ms += det->LastLatencyMs();
@@ -127,10 +93,51 @@ std::vector<Instance> InferTwoStage(MnnRunner* det, MnnRunner* mk, const Config&
   if (!ParseDetHead(det_shape, det_data, cfg.num_classes, &head, err)) return out;
   if (head.N == 0) return out;
 
+  // ---- 逐行解析: [x1,y1,x2,y2, score, class_id]，反 letterbox 到原图
   YoloDetOut boxes;
-  DecodeDetections(head.boxes.data(), head.scores.data(), head.classes.data(), head.N,
-                   cfg.conf, img.width, img.height, lb.ratio, lb.pad_x,
-                   lb.pad_y, cfg.nms_iou, &boxes);
+  {
+    std::vector<Box> all;
+    std::vector<int> cls_all;
+    std::vector<float> score_all;
+    all.reserve(head.N);
+    for (int i = 0; i < head.N; ++i) {
+      const float* r = head.rows + static_cast<size_t>(i) * head.cols;
+      const float score = r[4];
+      if (score < cfg.conf) continue;
+      const int cls = static_cast<int>(std::lround(r[5]));
+      if (cls < 0 || cls >= cfg.num_classes) continue;
+      Box lbx{r[0], r[1], r[2], r[3]};
+      if (lbx.area() <= 0.f) continue;
+      Box ob{(lbx.x1 - lb.pad_x) / lb.ratio, (lbx.y1 - lb.pad_y) / lb.ratio,
+             (lbx.x2 - lb.pad_x) / lb.ratio, (lbx.y2 - lb.pad_y) / lb.ratio};
+      ob = ClipBox(ob, img.width, img.height);
+      if (ob.area() <= 0.f) continue;
+      all.push_back(ob);
+      cls_all.push_back(cls);
+      score_all.push_back(score);
+    }
+    if (all.empty()) return out;
+    // 按分数降序 + 类内 NMS
+    std::vector<int> order(all.size());
+    for (size_t i = 0; i < order.size(); ++i) order[i] = static_cast<int>(i);
+    std::sort(order.begin(), order.end(),
+              [&](int a, int b) { return score_all[a] > score_all[b]; });
+    std::vector<uint8_t> dead(order.size(), 0);
+    for (size_t i = 0; i < order.size(); ++i) {
+      if (dead[i]) continue;
+      for (size_t j = i + 1; j < order.size(); ++j) {
+        if (dead[j]) continue;
+        if (cls_all[order[i]] != cls_all[order[j]]) continue;   // 类内 NMS
+        if (BoxIou(all[order[i]], all[order[j]]) > cfg.nms_iou) dead[j] = 1;
+      }
+    }
+    for (size_t i = 0; i < order.size(); ++i) {
+      if (dead[i]) continue;
+      boxes.boxes.push_back(all[order[i]]);
+      boxes.class_ids.push_back(cls_all[order[i]]);
+      boxes.scores.push_back(score_all[order[i]]);
+    }
+  }
   if (boxes.boxes.empty()) return out;
 
   // ================= 第二级：ROI 裁剪 + MK-UNet =================
@@ -280,10 +287,10 @@ Summary RunPipeline(const Config& cfg, bool verbose) {
 
   // ---- 预热两个模型
   {
-    std::vector<float> w1(static_cast<size_t>(cfg.det_imgsz) * cfg.det_imgsz, 0.5f);
+    std::vector<float> w1(static_cast<size_t>(cfg.det_imgsz) * cfg.det_imgsz * 3, 0.5f);
     std::vector<float> w2(static_cast<size_t>(cfg.roi_size) * cfg.roi_size, 0.5f);
     for (int i = 0; i < cfg.warmup; ++i) {
-      if (!det.Forward(w1.data(), {1, 1, cfg.det_imgsz, cfg.det_imgsz}, &err)) {
+      if (!det.Forward(w1.data(), {1, 3, cfg.det_imgsz, cfg.det_imgsz}, &err)) {
         fprintf(stderr, "[error] 检测模型预热失败: %s\n", err.c_str());
         return sum;
       }
