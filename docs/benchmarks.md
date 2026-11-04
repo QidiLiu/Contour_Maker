@@ -42,9 +42,9 @@ GT 解码：
 
 | 方案 | 输入 | 超声 | ADE20K-10 |
 |---|---|---|---|
-| YOLO-Seg | letterbox 512² | 60 epoch, batch 12 | 20 epoch, batch 12 |
-| Det-UNet | det 512² + ROI 256² | det 60 + MK-UNet 60 | det 20 + MK-UNet 20 |
-| RF-DETR-Seg | resize 384² | 8 epoch, batch 8 | 8 epoch, batch 8 |
+| YOLO-Seg | letterbox 512² | 60 epoch, batch 12 | 15 epoch, batch 12 |
+| Det-UNet | det 512² + ROI 256² | det 60 + MK-UNet 60 | det 15 + MK-UNet 15 |
+| RF-DETR-Seg | resize 384² | 8 epoch, batch 8 | 6 epoch, batch 8 |
 
 RF-DETR 的 Nano 输入边长必须是 12 的倍数。默认 384² 是在单卡 16 GB 上兼顾时间与精度的折中；
 504² 也可训练，但约慢 2 倍。
@@ -60,33 +60,18 @@ TBD（训练/测试完成后填入）。
 ## 6. 权重获取（RF-DETR）
 
 `rfdetr` 包默认从 `storage.googleapis.com` 下载 `rf-detr-seg-nano.pt`。该域名在国内通常很慢
-（实测约 30–100 KB/s）。可行的替代：
+（实测约 30–100 KB/s）。项目提供一键转换脚本：
 
-1. 从 HF 镜像下载 transformers 权重：
+```bash
+python scripts/convert_rfdetr_weights.py
+```
 
-   ```bash
-   curl -L -o /tmp/rfdetr_seg_nano.safetensors \
-     https://hf-mirror.com/Roboflow/rf-detr-seg-nano/resolve/main/model.safetensors
-   ```
+脚本会从 HF 镜像下载 `Roboflow/rf-detr-seg-nano` 的 `model.safetensors`，校验键名/形状，
+写入 `~/.roboflow/models/rf-detr-seg-nano.pt`。之后 `RFDETRSegNano()` 与
+`train_rfdetr_seg.py` 会直接加载它。
 
-2. 转成 rfdetr 的检查点格式（键名与形状完全一致，只差 `_kp_active_mask`）：
-
-   ```python
-   import os, torch
-   from safetensors.torch import load_file
-   from rfdetr import RFDETRSegNano
-
-   sd = load_file("/tmp/rfdetr_seg_nano.safetensors")
-   m = RFDETRSegNano(pretrain_weights=None)
-   mc = m.model_config
-   args = dict(mc.model_dump())
-   args.update(num_queries=mc.num_queries, group_detr=mc.group_detr, num_classes=90)
-   out = os.path.expanduser("~/.roboflow/models/rf-detr-seg-nano.pt")
-   torch.save({"model": sd, "args": args}, out)
-   ```
-
-3. 之后 `RFDETRSegNano()` / `train_rfdetr_seg.py` 会直接加载该文件。MD5 告警可忽略
-   （文件是本地转换的，不是官方原文件）。
+> 该文件的 MD5 与官方原文件不同，rfdetr 会打印一条“MD5 mismatch”警告；这是预期的
+> （本地转换文件），不影响加载。若想消除警告，可在训练脚本里显式传 `--weights` 路径。
 
 ## 7. 解读注意事项
 

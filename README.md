@@ -2,6 +2,7 @@
 
 > 超声病灶与通用场景的**三方案实例分割**对比：训练在 PyTorch，部署在 C++/MNN。
 > Three instance-segmentation schemes, one shared data/metric protocol: PyTorch training, C++/MNN deployment.
+> [English README](README.en.md)
 
 | 方案 | 模型 | 一句话 |
 |---|---|---|

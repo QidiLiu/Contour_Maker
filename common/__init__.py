@@ -1,6 +1,3 @@
-"""Ultrasound lesion segmentation: shared library.
+"""Shared library for Contour_Maker (data, metrics, models, evaluation)."""
 
-被 det-unet-train/ 与 yolo-seg-train/ 共同使用。
-"""
-
-__version__ = "2.0.0"
+__version__ = "3.0.0"

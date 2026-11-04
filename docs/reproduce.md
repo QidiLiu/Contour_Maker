@@ -75,7 +75,7 @@ cd "$ROOT/rfdetr-seg-train"
 $PY train_rfdetr_seg.py --dataset ultrasound \
     --epochs 8 --batch 8 --resolution 384 --name rfdetr_seg_ultrasound
 $PY validate.py --weights "$ROOT/runs/rfdetr_seg_ultrasound/checkpoint_best_total.pth" \
-    --split test --out "$ROOT/reports/ultrasound_rfdetr_seg_py"
+    --resolution 384 --split test --out "$ROOT/reports/ultrasound_rfdetr_seg_py"
 cd "$ROOT"
 ```
 
@@ -94,7 +94,7 @@ $PY -m common.coco_export --dataset ade20k
 
 ```bash
 cd "$ROOT/yolo-seg-train"
-$PY train_yolo_seg.py --dataset ade20k --epochs 20 --imgsz 512 --batch 12 \
+$PY train_yolo_seg.py --dataset ade20k --epochs 15 --imgsz 512 --batch 12 \
     --name yolo_seg_ade20k
 $PY validate.py --dataset ade20k --seg "$ROOT/runs/yolo_seg_ade20k/weights/best.pt" \
     --split test --out "$ROOT/reports/ade20k_yolo_seg_py"
@@ -105,7 +105,7 @@ cd "$ROOT"
 
 ```bash
 cd "$ROOT/det-unet-train"
-$PY train_yolo_det.py --dataset ade20k --epochs 20 --imgsz 512 --batch 16 \
+$PY train_yolo_det.py --dataset ade20k --epochs 15 --imgsz 512 --batch 16 \
     --name det_ade20k
 $PY build_roi_dataset.py --dataset ade20k --splits train --box-source det \
     --det "$ROOT/runs/det_ade20k/weights/best.pt" \
@@ -114,7 +114,7 @@ $PY build_roi_dataset.py --dataset ade20k --splits val --box-source gt \
     --out "$ROOT/data/ade20k/roi_cache/val"
 $PY train_mkunet.py --data "$ROOT/data/ade20k/roi_cache/train" \
     --val-data "$ROOT/data/ade20k/roi_cache/val" \
-    --variant MK_UNet --roi-size 256 --epochs 20 --batch 16 --name mkunet_ade20k
+    --variant MK_UNet --roi-size 256 --epochs 15 --batch 16 --name mkunet_ade20k
 $PY validate.py --dataset ade20k --det "$ROOT/runs/det_ade20k/weights/best.pt" \
     --mkunet "$ROOT/runs/mkunet_ade20k/best.pt" --split test \
     --out "$ROOT/reports/ade20k_det_unet_py"
@@ -125,11 +125,11 @@ cd "$ROOT"
 
 ```bash
 cd "$ROOT/rfdetr-seg-train"
-$PY train_rfdetr_seg.py --dataset ade20k --epochs 8 --batch 8 --resolution 384 \
+$PY train_rfdetr_seg.py --dataset ade20k --epochs 6 --batch 8 --resolution 384 \
     --name rfdetr_seg_ade20k
 $PY validate.py --dataset ade20k \
     --weights "$ROOT/runs/rfdetr_seg_ade20k/checkpoint_best_total.pth" \
-    --split test --out "$ROOT/reports/ade20k_rfdetr_seg_py"
+    --resolution 384 --split test --out "$ROOT/reports/ade20k_rfdetr_seg_py"
 cd "$ROOT"
 ```
 

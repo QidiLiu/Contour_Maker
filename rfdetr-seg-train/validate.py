@@ -23,6 +23,7 @@ from common.config import (  # noqa: E402
     ADE20K_SPLITS,
     ADE20K_UNIFIED,
     CLASS_NAMES,
+    RFDETR_RESOLUTION,
     SPLITS,
     UNIFIED,
     YOLO_CONF,
@@ -72,6 +73,7 @@ def main() -> int:
     ap.add_argument("--gt-instances", default=None)
     ap.add_argument("--classes", default=None)
     ap.add_argument("--conf", type=float, default=YOLO_CONF)
+    ap.add_argument("--resolution", type=int, default=RFDETR_RESOLUTION)
     ap.add_argument("--max-images", type=int, default=None)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--save-vis", type=int, default=20)
@@ -103,7 +105,7 @@ def main() -> int:
 
     from rfdetr import RFDETRSegNano
 
-    model = RFDETRSegNano(pretrain_weights=args.weights)
+    model = RFDETRSegNano(pretrain_weights=args.weights, resolution=args.resolution)
     df = load_split(args.split, splits_csv, max_images=args.max_images)
     print(
         f"[cfg ] scheme=rfdetr-seg dataset={args.dataset} split={args.split} "

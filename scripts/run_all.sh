@@ -116,7 +116,8 @@ do_validate() {
   say "Python validation (RF-DETR-Seg)"
   cd "$ROOT/rfdetr-seg-train"
   "$PY" validate.py --weights "$ROOT/runs/$RFDETR_RUN/checkpoint_best_total.pth" \
-      --split test --out "$ROOT/reports/ultrasound_rfdetr_seg_py"
+      --resolution "${RFDETR_RESOLUTION:-384}" --split test \
+      --out "$ROOT/reports/ultrasound_rfdetr_seg_py"
   cd "$ROOT"
 }
 
