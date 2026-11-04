@@ -138,12 +138,25 @@ std::vector<Instance> Infer(MnnRunner* runner, const Config& cfg, const Image& i
   if (cands.empty()) return out;
 
   // ---- NMS（按类别独立，避免不同类别互相抑制）
-  std::vector<Box> nb;
-  std::vector<float> ns;
-  nb.reserve(cands.size());
-  ns.reserve(cands.size());
-  for (const auto& c : cands) { nb.push_back(c.orig); ns.push_back(c.score); }
-  const std::vector<int> keep = Nms(nb, ns, cfg.nms_iou);
+  // 先按 score 降序，再只抑制同类别的高 IoU 框。
+  std::vector<int> order(cands.size());
+  for (size_t i = 0; i < order.size(); ++i) order[i] = static_cast<int>(i);
+  std::sort(order.begin(), order.end(),
+            [&](int a, int b) { return cands[a].score > cands[b].score; });
+  std::vector<uint8_t> dead(cands.size(), 0);
+  for (size_t i = 0; i < order.size(); ++i) {
+    if (dead[i]) continue;
+    for (size_t j = i + 1; j < order.size(); ++j) {
+      if (dead[j]) continue;
+      if (cands[order[i]].cls != cands[order[j]].cls) continue;
+      if (BoxIou(cands[order[i]].orig, cands[order[j]].orig) > cfg.nms_iou) dead[j] = 1;
+    }
+  }
+  std::vector<int> keep;
+  keep.reserve(order.size());
+  for (size_t i = 0; i < order.size(); ++i) {
+    if (!dead[i]) keep.push_back(order[i]);
+  }
 
   // ---- 掩码组合 + 贴回原图
   const float proto_scale = static_cast<float>(cfg.imgsz) / head.Wp;  // 512/128 = 4
@@ -199,14 +212,11 @@ std::vector<Instance> Infer(MnnRunner* runner, const Config& cfg, const Image& i
       }
     }
 
-    auto comps = MaskToComponents(inst.mask, img.width, img.height, cfg.mask_min_area);
-    if (comps.empty()) continue;
-    // 只保留最大连通域（与 Python 侧一致）
-    size_t best = 0;
-    for (size_t ci = 1; ci < comps.size(); ++ci) {
-      if (comps[ci].area > comps[best].area) best = ci;
+    // Keep the full mask (the Python side keeps the filled polygon, including
+    // any secondary components); only use the components for the min-area filter.
+    if (MaskToComponents(inst.mask, img.width, img.height, cfg.mask_min_area).empty()) {
+      continue;
     }
-    inst.mask = comps[best].mask;
     if (MaskToContour(inst.mask, img.width, img.height, &inst.contour)) {
       out.push_back(std::move(inst));
     }

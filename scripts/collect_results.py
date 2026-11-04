@@ -26,7 +26,9 @@ def _flatten(path: Path) -> dict | None:
     run = path.parent.name
     parts = run.split("_")
     runtime = parts[-1] if parts[-1] in {"py", "cxx"} else "?"
-    scheme = run[: -(len(runtime) + 1)] if runtime != "?" else run
+    dataset = parts[0] if parts[0] in {"ultrasound", "ade20k"} else "?"
+    rest = run[len(dataset) + 1:] if dataset != "?" else run
+    scheme = rest[: -(len(runtime) + 1)] if runtime != "?" else rest
     seg = data.get("segmentation", {}) or {}
     det = data.get("detection", {}) or {}
     speed = data.get("speed", {}) or {}
@@ -44,6 +46,7 @@ def _flatten(path: Path) -> dict | None:
         det["f1"] = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
     return dict(
         run=run,
+        dataset=dataset,
         scheme=scheme,
         runtime=runtime,
         n_images=data.get("n_images", 0),
@@ -76,7 +79,7 @@ def main() -> int:
     if not rows:
         print("no summary.json found")
         return 1
-    df = pd.DataFrame(rows).sort_values(["scheme", "runtime"])
+    df = pd.DataFrame(rows).sort_values(["dataset", "scheme", "runtime"])
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "summary.csv", index=False)

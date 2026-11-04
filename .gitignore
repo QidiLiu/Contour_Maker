@@ -53,3 +53,6 @@ third_party/
 *.log
 *.tmp
 reports/
+
+# ADE20K models are generated locally (not committed)
+models/ade20k/

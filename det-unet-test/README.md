@@ -58,7 +58,7 @@ $MC -f ONNX --modelFile models/mkunet.onnx      --MNNModel models/mkunet.mnn
 ./build/det-unet-test/det_unet_test \
     --det models/yolo26n_det.mnn \
     --mkunet models/mkunet.mnn \
-    --image-dir data/unified/images \
+    --list-file data/splits/test.txt \
     --gt-dir data/unified/masks \
     --det-imgsz 512 --roi-size 256 --pad-ratio 0.15 --conf 0.25 \
     --out-dir reports/det_unet_cxx
@@ -78,6 +78,7 @@ $MC -f ONNX --modelFile models/mkunet.onnx      --MNNModel models/mkunet.mnn
 | `--det` / `--mkunet` | 必需 | 两个 `.mnn` 模型 |
 | `--image-dir` / `--list-file` / `--single` | — | 输入来源 |
 | `--gt-dir` | — | GT 掩码目录，提供则评估 |
+| `--gt-instances` | — | 逐实例类别 sidecar（ADE20K） |
 | `--out-dir` | — | 输出 `per_image.csv` |
 | `--backend` | `cpu` | `cpu` / `opencl` |
 | `--det-imgsz` | 512 | 检测输入尺寸 |

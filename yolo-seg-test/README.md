@@ -33,7 +33,7 @@ build/mnn-conv/MNNConvert -f ONNX \
 ```bash
 ./build/yolo-seg-test/yolo_seg_test \
     --model models/yolo26n_seg.mnn \
-    --image-dir data/unified/images \
+    --list-file data/splits/test.txt \
     --gt-dir data/unified/masks \
     --imgsz 512 --conf 0.25 --num-classes 4 \
     --out-dir reports/yolo_seg_cxx
@@ -54,6 +54,7 @@ build/mnn-conv/MNNConvert -f ONNX \
 | `--image-dir` / `--list-file` | 二选一 | 图像目录 / 图像清单 |
 | `--single` | — | 只推理单张图并打印详情 |
 | `--gt-dir` | — | GT 掩码目录，提供则评估精度 |
+| `--gt-instances` | — | 逐实例类别 sidecar（ADE20K） |
 | `--out-dir` | — | 输出 `per_image.csv` |
 | `--backend` | `cpu` | `cpu` / `opencl`（不可用时自动降级） |
 | `--imgsz` | 512 | 推理输入尺寸 |
@@ -78,8 +79,8 @@ build/mnn-conv/MNNConvert -f ONNX \
 - **NMS**：头部虽自带 TopK，但同一框会跨类别重复出现，故 C++ 侧仍按类别独立做
   NMS（`--nms-iou`）。
 - **掩码组合**：按 YOLACT 方式 `coeff · protos`，只在框内区域计算以省时间；
-  原型网格 (128×128) 上的结果二值化（`> 0`）后，最近邻放到原图框区域，
-  再取最大连通域（`--min-area` 过滤）。
+  原型网格 (128×128) 上的结果二值化（`> 0`）后，最近邻放到原图框区域；
+  保留完整掩码，仅用连通域做 `--min-area` 过滤（与 Python 侧一致）。
 - **输入**：模型要求 3 通道，C++ 侧把灰度 letterbox 结果复制到 3 个通道。
 - 图像 IO 用自带的最小 PNG 编解码器（`cxx-common/src/png.cpp`），
   已验证与 OpenCV 逐字节一致。

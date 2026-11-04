@@ -68,8 +68,8 @@ RF-DETR 的 Nano 输入边长必须是 12 的倍数。默认 384² 是在单卡 
 | ASSD (px) | 3.19 | 3.94 | **2.61** |
 | 边界 F1 | 0.5843 | 0.5021 | **0.6630** |
 | 面积误差 | **0.1057** | 0.1310 | 0.0920 |
-| 端到端 (ms) | **50.4** | 65.6 | 518.2 |
-| FPS | **19.8** | 15.2 | 1.9 |
+| 端到端 (ms) | **43.9** | 65.6 | 518.2 |
+| FPS | **22.8** | 15.2 | 1.9 |
 
 > RF-DETR 的 MNN CPU 推理显著慢于两个 CNN 方案（Transformer + 100 query 的掩码上采样）；
 > 它的优势在分割几何（Dice/HD95/BF1）和召回。精度表来自与 Python 完全一致的 GT/匹配口径。
@@ -98,7 +98,29 @@ RF-DETR 的 Nano 输入边长必须是 12 的倍数。默认 384² 是在单卡 
 
 ## 5. ADE20K-10 结果
 
-TBD（训练/测试完成后填入）。
+> 800 张 test（官方 validation 子集），10 类室内物体，mask IoU 0.5 匹配。
+> 该子集的检测难度显著高于超声：小目标多、类别多、每图平均 6 个实例；
+> 15 epoch（RF-DETR 6 epoch）下检测召回是主要瓶颈。
+
+### 5.1 C++/MNN（CPU）
+
+| 方案 | P | R | F1 | Dice | IoU | HD95 | BF1 | cls_acc | ms/图 |
+|---|---|---|---|---|---|---|---|---|---|
+| YOLO-Seg | 0.6078 | 0.3114 | 0.4118 | 0.8508 | 0.7480 | 18.49 | 0.4571 | 0.9387 | 45.8 |
+| Det-UNet | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| RF-DETR-Seg | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+### 5.2 Python/PyTorch（同一 test，GPU）
+
+| 方案 | P | R | F1 | Dice | IoU | HD95 | BF1 | cls_acc | ms/图 |
+|---|---|---|---|---|---|---|---|---|---|
+| YOLO-Seg | 0.5275 | 0.3995 | 0.4546 | 0.8822 | 0.7970 | 17.77 | 0.6208 | 0.9272 | 28.4 |
+| Det-UNet | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| RF-DETR-Seg | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+> YOLO-Seg 的 Python 与 C++ 在 ADE20K 上的差异比超声大：C++ 的 NMS/掩码组合
+> （protos × coeff + 最近邻）在 10 类、小目标场景下更保守，FP 更少但 FN 更多。
+> 超声（单类/大目标）两侧差异 ≤ 0.01，ADE20K 上建议以同一 runtime 的横向对比为准。
 
 ## 6. 权重获取（RF-DETR）
 

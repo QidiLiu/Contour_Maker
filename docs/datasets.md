@@ -97,7 +97,7 @@ unified/instances/<uid>.csv     instance_id,class_id
 .venv/bin/python -m common.coco_export --dataset ade20k
 ```
 
-下载源：`https://hf-mirror.com/datasets/zhoubolei/scene_parse_150/resolve/refs/convert/parquet/instance_segmentation/...`。
+下载源默认走 `hf-mirror.com`（可用 `HF_ENDPOINT=https://huggingface.co` 覆盖）。
 
 许可证：ADE20K 为 **BSD-3-Clause**；本项目只分发脚本，不重新分发图像/标注。
 

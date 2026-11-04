@@ -15,6 +15,7 @@ Scripts that need to work on both datasets accept explicit ``--unified`` /
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # ---------------------------------------------------------------- paths
@@ -123,7 +124,7 @@ ADE20K_MAX_INSTANCES = 200
 # ---------------------------------------------------------------- dataset sources
 # Unified mirror: us-segmentator/us-segmentation-dataset (hf-mirror reachable).
 HF_REPO = "us-segmentator/us-segmentation-dataset"
-HF_ENDPOINT = "https://hf-mirror.com"
+HF_ENDPOINT = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com").rstrip("/")
 
 # ADE20K instance segmentation (converted parquet on the HF mirror).
 ADE20K_HF_REPO = "zhoubolei/scene_parse_150"
