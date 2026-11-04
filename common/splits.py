@@ -4,6 +4,7 @@
     python -m common.splits                       # 生成 splits.csv
     python -m common.splits --verify <old.csv>    # 与旧划分对照
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,15 +17,16 @@ import pandas as pd
 
 from .config import (
     CLASS_NAMES,
-    SPLITS,
     SPLIT_FRACTIONS,
     SPLIT_SEED,
+    SPLITS,
     UNIFIED,
 )
 
 
-def make_splits(manifest: pd.DataFrame, seed: int = SPLIT_SEED,
-                fractions: dict | None = None) -> pd.DataFrame:
+def make_splits(
+    manifest: pd.DataFrame, seed: int = SPLIT_SEED, fractions: dict | None = None
+) -> pd.DataFrame:
     """按 (dataset, class_id) 分层，把每层按比例分配到 train/val/test。
 
     分层键保证 BUSI 良性/恶性的比例在三个 split 中一致，
@@ -49,28 +51,29 @@ def make_splits(manifest: pd.DataFrame, seed: int = SPLIT_SEED,
         n_val = min(n_val, max(0, n - 2))
         n_test = min(n_test, max(0, n - 1 - n_val))
         labels = ["train"] * (n - n_val - n_test) + ["val"] * n_val + ["test"] * n_test
-        for i, lab in zip(idx, labels):
+        for i, lab in zip(idx, labels, strict=False):
             df.loc[i, "split"] = lab
 
     assert (df["split"] != "").all(), "存在未分配的样本"
     return df
 
 
-def _report(df: pd.DataFrame) -> None:
+def _report(df: pd.DataFrame, class_names: list[str] | None = None) -> None:
+    names = class_names or CLASS_NAMES
     print("=== split x dataset ===")
     print(pd.crosstab(df["dataset"], df["split"]))
     print("\n=== split x class ===")
     ct = pd.crosstab(df["class_id"], df["split"])
-    ct.index = [f"{i}:{CLASS_NAMES[i]}" for i in ct.index]
+    ct.index = [f"{i}:{names[i] if i < len(names) else '?'}" for i in ct.index]
     print(ct)
 
-    print("\n=== 每 split 的类别覆盖 ===")
+    print("\n=== per-split class coverage ===")
     for s in ("train", "val", "test"):
         sub = df[df["split"] == s]
         present = sorted(sub["class_id"].unique().tolist())
-        missing = [c for c in range(len(CLASS_NAMES)) if c not in present]
-        tag = "OK" if not missing else f"缺 {missing}"
-        print(f"  {s:5s} n={len(sub):5d}  类别 {present}  {tag}")
+        missing = [c for c in range(len(names)) if c not in present]
+        tag = "OK" if not missing else f"missing {missing}"
+        print(f"  {s:5s} n={len(sub):5d}  classes {present}  {tag}")
 
 
 def verify_against_old(old_csv: str, new_df: pd.DataFrame) -> None:
@@ -96,11 +99,15 @@ def verify_against_old(old_csv: str, new_df: pd.DataFrame) -> None:
     for s in ("train", "val", "test"):
         o = old[old["split"] == s]
         n = new_df[new_df["split"] == s]
-        rows.append(dict(
-            split=s, old_n=len(o), new_n=len(n),
-            old_pct=round(100 * len(o) / len(old), 2),
-            new_pct=round(100 * len(n) / len(new_df), 2),
-        ))
+        rows.append(
+            dict(
+                split=s,
+                old_n=len(o),
+                new_n=len(n),
+                old_pct=round(100 * len(o) / len(old), 2),
+                new_pct=round(100 * len(n) / len(new_df), 2),
+            )
+        )
     print(pd.DataFrame(rows).to_string(index=False))
 
     old_ds = old["uid"].astype(str).str.split("_").str[0]
@@ -118,30 +125,46 @@ def verify_against_old(old_csv: str, new_df: pd.DataFrame) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="生成分层划分")
     ap.add_argument("--seed", type=int, default=SPLIT_SEED)
-    ap.add_argument("--verify", type=str, default=None, help="旧 splits.csv 路径")
+    ap.add_argument("--verify", type=str, default=None, help="old splits.csv path")
+    ap.add_argument("--manifest", default=None, help="manifest.csv path")
+    ap.add_argument("--out", default=None, help="output splits.csv path")
+    ap.add_argument("--classes", default=None, help="comma-separated class names")
     args = ap.parse_args()
 
-    man_path = UNIFIED / "manifest.csv"
+    man_path = Path(args.manifest) if args.manifest else UNIFIED / "manifest.csv"
     if not man_path.exists():
         print(f"[error] 未找到 {man_path}, 请先运行 python -m common.data_prep --build")
         return 1
 
     manifest = pd.read_csv(man_path)
-    print(f"[in ] manifest: {len(manifest)} 张, "
-          f"{manifest['dataset'].nunique()} 数据集, "
-          f"{manifest['class_id'].nunique()} 类别\n")
+    print(
+        f"[in ] manifest: {len(manifest)} 张, "
+        f"{manifest['dataset'].nunique()} 数据集, "
+        f"{manifest['class_id'].nunique()} 类别\n"
+    )
 
+    class_names = (
+        [c.strip() for c in args.classes.split(",") if c.strip()] if args.classes else CLASS_NAMES
+    )
     df = make_splits(manifest, seed=args.seed)
-    SPLITS.mkdir(parents=True, exist_ok=True)
-    out = SPLITS / "splits.csv"
+    out = Path(args.out) if args.out else SPLITS / "splits.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
-    _report(df)
+    _report(df, class_names)
 
-    (SPLITS / "splits_meta.json").write_text(json.dumps(dict(
-        seed=args.seed, fractions=SPLIT_FRACTIONS,
-        num_classes=len(CLASS_NAMES), class_names=CLASS_NAMES,
-        counts={s: int((df["split"] == s).sum()) for s in ("train", "val", "test")},
-    ), indent=2, ensure_ascii=False))
+    (out.parent / "splits_meta.json").write_text(
+        json.dumps(
+            dict(
+                seed=args.seed,
+                fractions=SPLIT_FRACTIONS,
+                num_classes=len(class_names),
+                class_names=class_names,
+                counts={s: int((df["split"] == s).sum()) for s in ("train", "val", "test")},
+            ),
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
     print(f"\n-> {out}")
     if args.verify:

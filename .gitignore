@@ -5,6 +5,8 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.cache/
 
 # ---------------------------------------------------------------- data (large, re-downloadable)
 data/raw/
@@ -14,17 +16,23 @@ data/splits/
 data/yolo_det/
 data/yolo_seg/
 data/roi_cache/
+data/coco/
+data/ade20k/
 
-# ---------------------------------------------------------------- 训练产物
-# runs/ 权重不入库（体积大）；models/ 只保留转换后的 .mnn 作为交付物
+# ---------------------------------------------------------------- training artifacts
+# runs/ is large; only the converted .mnn files are committed
 runs/
 logs/
 *.pt
 *.pth
+*.ckpt
 *.onnx
 *.onnx.data
-# 例外：ultralytics 预训练基座权重（首次训练必需，官方源下载不稳定）
-!weights/*.pt
+*.mnn
+# exceptions: the two YOLO base weights used as training starts, and the
+# deployed ultrasound .mnn files (deliverables)
+!weights/yolo26n.pt
+!weights/yolo26n-seg.pt
 !models/*.mnn
 
 # ---------------------------------------------------------------- C++ build
@@ -41,6 +49,5 @@ third_party/
 # ---------------------------------------------------------------- misc
 .DS_Store
 *.log
-# 验证产物
+*.tmp
 reports/
-logs/

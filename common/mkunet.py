@@ -10,6 +10,7 @@
   3. 权重初始化: 原 timm 版本在 trunc_normal_ 后做一次额外的 std 缩放，
      此处保留同等行为（named_apply(trunc_normal_tf_, std=.02) -> 等价实现）
 """
+
 from __future__ import annotations
 
 import math
@@ -19,8 +20,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def _trunc_normal_(tensor: torch.Tensor, mean: float = 0.0, std: float = 1.0,
-                   a: float = -2.0, b: float = 2.0) -> torch.Tensor:
+def _trunc_normal_(
+    tensor: torch.Tensor, mean: float = 0.0, std: float = 1.0, a: float = -2.0, b: float = 2.0
+) -> torch.Tensor:
     """等价于 timm.layers.trunc_normal_tf_（对 2D+ 张量生效）。
 
     timm 的实现先 trunc_normal_ 再按 fan_in 重估 std，目的是让权重方差与
@@ -153,25 +155,28 @@ class MultiKernelDepthwiseConv(nn.Module):
     严格对齐官方实现：每个分支是 Conv(groups=C) + BN + 激活。
     """
 
-    def __init__(self, in_channels, kernel_sizes, stride, activation="relu6",
-                 dw_parallel=True):
+    def __init__(self, in_channels, kernel_sizes, stride, activation="relu6", dw_parallel=True):
         super().__init__()
         self.in_channels = in_channels
-        self.kernel_sizes = list(kernel_sizes) if isinstance(kernel_sizes, (list, tuple)) \
-            else [kernel_sizes]
+        self.kernel_sizes = (
+            list(kernel_sizes) if isinstance(kernel_sizes, (list, tuple)) else [kernel_sizes]
+        )
         self.stride = stride
         self.activation = activation
         self.dw_parallel = dw_parallel
         act = nn.ReLU6(inplace=True) if activation == "relu6" else nn.ReLU(inplace=True)
-        self.dwconvs = nn.ModuleList([
-            nn.Sequential(
-                nn.Conv2d(in_channels, in_channels, k, stride, k // 2,
-                          groups=in_channels, bias=False),
-                nn.BatchNorm2d(in_channels),
-                act,
-            )
-            for k in self.kernel_sizes
-        ])
+        self.dwconvs = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(
+                        in_channels, in_channels, k, stride, k // 2, groups=in_channels, bias=False
+                    ),
+                    nn.BatchNorm2d(in_channels),
+                    act,
+                )
+                for k in self.kernel_sizes
+            ]
+        )
         self.init_weights("normal")
 
     def init_weights(self, scheme=""):
@@ -200,9 +205,17 @@ class MultiKernelInvertedResidualBlock(nn.Module):
     add=False : 各分支 concat 后 channel shuffle（通道数 x n_scales）
     """
 
-    def __init__(self, in_c, out_c, stride, expansion_factor=2,
-                 dw_parallel=True, add=True, kernel_sizes=(1, 3, 5),
-                 activation="relu6"):
+    def __init__(
+        self,
+        in_c,
+        out_c,
+        stride,
+        expansion_factor=2,
+        dw_parallel=True,
+        add=True,
+        kernel_sizes=(1, 3, 5),
+        activation="relu6",
+    ):
         super().__init__()
         assert stride in (1, 2)
         self.in_c = in_c
@@ -220,7 +233,8 @@ class MultiKernelInvertedResidualBlock(nn.Module):
             act,
         )
         self.multi_scale_dwconv = MultiKernelDepthwiseConv(
-            self.ex_c, kernel_sizes, stride, activation, dw_parallel=dw_parallel)
+            self.ex_c, kernel_sizes, stride, activation, dw_parallel=dw_parallel
+        )
 
         self.combined_channels = self.ex_c if add else self.ex_c * self.n_scales
         self.pconv2 = nn.Sequential(
@@ -259,18 +273,43 @@ class MultiKernelInvertedResidualBlock(nn.Module):
         return out
 
 
-def mk_irb_bottleneck(in_c, out_c, n, stride, expansion_factor=2, dw_parallel=True,
-                       add=True, kernel_sizes=(1, 3, 5), activation="relu6"):
+def mk_irb_bottleneck(
+    in_c,
+    out_c,
+    n,
+    stride,
+    expansion_factor=2,
+    dw_parallel=True,
+    add=True,
+    kernel_sizes=(1, 3, 5),
+    activation="relu6",
+):
     """生成 n 个串联的 MK-IRB（首个 stride=s，其余 stride=1）。"""
-    blocks = [MultiKernelInvertedResidualBlock(
-        in_c, out_c, stride, expansion_factor=expansion_factor,
-        dw_parallel=dw_parallel, add=add, kernel_sizes=kernel_sizes,
-        activation=activation)]
+    blocks = [
+        MultiKernelInvertedResidualBlock(
+            in_c,
+            out_c,
+            stride,
+            expansion_factor=expansion_factor,
+            dw_parallel=dw_parallel,
+            add=add,
+            kernel_sizes=kernel_sizes,
+            activation=activation,
+        )
+    ]
     for _ in range(1, n):
-        blocks.append(MultiKernelInvertedResidualBlock(
-            out_c, out_c, 1, expansion_factor=expansion_factor,
-            dw_parallel=dw_parallel, add=add, kernel_sizes=kernel_sizes,
-            activation=activation))
+        blocks.append(
+            MultiKernelInvertedResidualBlock(
+                out_c,
+                out_c,
+                1,
+                expansion_factor=expansion_factor,
+                dw_parallel=dw_parallel,
+                add=add,
+                kernel_sizes=kernel_sizes,
+                activation=activation,
+            )
+        )
     return nn.Sequential(*blocks)
 
 
@@ -286,9 +325,16 @@ class _MKUNetBase(nn.Module):
       * 官方返回多尺度深监督输出，本项目只取最终 p4
     """
 
-    def __init__(self, num_classes=1, in_channels=1,
-                 channels=(16, 32, 64, 96, 160), depths=(1, 1, 1, 1, 1),
-                 kernel_sizes=(1, 3, 5), expansion_factor=2, gag_kernel=3):
+    def __init__(
+        self,
+        num_classes=1,
+        in_channels=1,
+        channels=(16, 32, 64, 96, 160),
+        depths=(1, 1, 1, 1, 1),
+        kernel_sizes=(1, 3, 5),
+        expansion_factor=2,
+        gag_kernel=3,
+    ):
         super().__init__()
         self.num_classes = num_classes
         self.channels = list(channels)
@@ -301,8 +347,9 @@ class _MKUNetBase(nn.Module):
         ef = expansion_factor
 
         # ---- encoder：encoder{i} 输出 channels[i-1]，随后 maxpool
-        self.enc1 = mk_irb_bottleneck(in_channels, c[0], d[0], 1,
-                                      expansion_factor=ef, kernel_sizes=ks)
+        self.enc1 = mk_irb_bottleneck(
+            in_channels, c[0], d[0], 1, expansion_factor=ef, kernel_sizes=ks
+        )
         self.enc2 = mk_irb_bottleneck(c[0], c[1], d[1], 1, expansion_factor=ef, kernel_sizes=ks)
         self.enc3 = mk_irb_bottleneck(c[1], c[2], d[2], 1, expansion_factor=ef, kernel_sizes=ks)
         self.enc4 = mk_irb_bottleneck(c[2], c[3], d[3], 1, expansion_factor=ef, kernel_sizes=ks)
@@ -370,7 +417,7 @@ class _MKUNetBase(nn.Module):
         t3 = x
         x = F.max_pool2d(self.enc4(x), 2, 2)
         t4 = x
-        x = F.max_pool2d(self.enc5(x), 2, 2)      # bottleneck
+        x = F.max_pool2d(self.enc5(x), 2, 2)  # bottleneck
 
         # ---- 注意力门控
         # 注意: ChannelAttention / SpatialAttention 的 forward 已经返回
@@ -407,24 +454,27 @@ class MK_UNet(_MKUNetBase):
     """MK-UNet 主变体 (channels=[16,32,64,96,160])，约 0.316M 参数。"""
 
     def __init__(self, num_classes=1, in_channels=1, **kw):
-        super().__init__(num_classes=num_classes, in_channels=in_channels,
-                         channels=(16, 32, 64, 96, 160), **kw)
+        super().__init__(
+            num_classes=num_classes, in_channels=in_channels, channels=(16, 32, 64, 96, 160), **kw
+        )
 
 
 class MK_UNet_S(_MKUNetBase):
     """小型变体 (channels=[8,16,32,48,80])。"""
 
     def __init__(self, num_classes=1, in_channels=1, **kw):
-        super().__init__(num_classes=num_classes, in_channels=in_channels,
-                         channels=(8, 16, 32, 48, 80), **kw)
+        super().__init__(
+            num_classes=num_classes, in_channels=in_channels, channels=(8, 16, 32, 48, 80), **kw
+        )
 
 
 class MK_UNet_T(_MKUNetBase):
     """微型变体 (channels=[4,8,16,24,32])。"""
 
     def __init__(self, num_classes=1, in_channels=1, **kw):
-        super().__init__(num_classes=num_classes, in_channels=in_channels,
-                         channels=(4, 8, 16, 24, 32), **kw)
+        super().__init__(
+            num_classes=num_classes, in_channels=in_channels, channels=(4, 8, 16, 24, 32), **kw
+        )
 
 
 VARIANTS = {
@@ -450,5 +500,4 @@ if __name__ == "__main__":
         x = torch.randn(1, 1, 256, 256)
         with torch.no_grad():
             y = net(x)
-        print(f"{name:12s} params={count_params(net)/1e6:.3f}M  "
-              f"out={tuple(y.shape)}")
+        print(f"{name:12s} params={count_params(net) / 1e6:.3f}M  out={tuple(y.shape)}")

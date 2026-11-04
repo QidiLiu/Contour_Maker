@@ -6,6 +6,7 @@
     python -m common.data_prep --build             # 统一 + 生成 manifest
     python -m common.data_prep --all
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,6 @@ from .config import (
     BUSI_DIRNAME_TO_CLASS,
     BUSI_EXCLUDE_DIRNAMES,
     DATASETS,
-    DATASET_BY_KEY,
     INTERIM,
     MASK_THRESHOLD,
     MIN_MASK_AREA,
@@ -39,7 +39,7 @@ def download_one(spec, force: bool = False) -> Path:
     """下载单个压缩包(带 .part 原子落盘 + 断点续传)。"""
     dest = RAW / spec.zip_name
     if dest.exists() and dest.stat().st_size > 0 and not force:
-        print(f"  [skip] {spec.zip_name} 已存在 ({dest.stat().st_size/1e6:.1f} MB)")
+        print(f"  [skip] {spec.zip_name} 已存在 ({dest.stat().st_size / 1e6:.1f} MB)")
         return dest
 
     import requests  # 延迟导入, 仅下载时需要
@@ -62,16 +62,18 @@ def download_one(spec, force: bool = False) -> Path:
                     done += len(chunk)
                     if total:
                         pct = 100.0 * done / total
-                        print(f"\r        {pct:5.1f}%  {done/1e6:7.1f}/{total/1e6:.1f} MB",
-                              end="", flush=True)
+                        print(
+                            f"\r        {pct:5.1f}%  {done / 1e6:7.1f}/{total / 1e6:.1f} MB",
+                            end="",
+                            flush=True,
+                        )
     print()
     part.rename(dest)
-    print(f"  [ok  ] {spec.zip_name} ({dest.stat().st_size/1e6:.1f} MB)")
+    print(f"  [ok  ] {spec.zip_name} ({dest.stat().st_size / 1e6:.1f} MB)")
     return dest
 
 
 def download_all(force: bool = False) -> None:
-    missing = [s for s in DATASETS if s.key not in {d.key for d in DATASETS}]
     for spec in DATASETS:
         download_one(spec, force=force)
 
@@ -184,7 +186,7 @@ def find_pairs(root: Path) -> list[tuple[Path, Path]]:
         masks: dict[str, Path] = {}
         for p in sorted(mdir.rglob("*")):
             if p.is_file() and is_image_file(p):
-                masks[p.stem] = p          # label 文件名与 img 完全同名
+                masks[p.stem] = p  # label 文件名与 img 完全同名
 
         # img 目录内一个逻辑样本可能有多个物理文件
         # (test1.png 与 test1.PNG.png 内容相同)，按去扩展名的 key 只取一个。
@@ -203,6 +205,7 @@ def find_pairs(root: Path) -> list[tuple[Path, Path]]:
 
 def os_walk(root: Path):
     import os
+
     return os.walk(root)
 
 
@@ -280,10 +283,15 @@ def build_one(spec, force: bool = False) -> pd.DataFrame:
     pairs = find_pairs(root)
     if spec.key == "busi":
         n_before = len(pairs)
-        pairs = [(i, m) for i, m in pairs
-                 if not any(part.lower() in BUSI_EXCLUDE_DIRNAMES for part in i.parts)]
-        print(f"  [pair] {spec.key}: {len(pairs)} 对 "
-              f"(排除 normal 无标注类 {n_before - len(pairs)} 张)")
+        pairs = [
+            (i, m)
+            for i, m in pairs
+            if not any(part.lower() in BUSI_EXCLUDE_DIRNAMES for part in i.parts)
+        ]
+        print(
+            f"  [pair] {spec.key}: {len(pairs)} 对 "
+            f"(排除 normal 无标注类 {n_before - len(pairs)} 张)"
+        )
 
     rows = []
     n_bad = 0
@@ -306,11 +314,21 @@ def build_one(spec, force: bool = False) -> pd.DataFrame:
         cv2.imwrite(str(dst_i), img)
         cv2.imwrite(str(dst_m), (mask * 255).astype(np.uint8))
 
-        rows.append(dict(
-            uid=safe, dataset=spec.key, modality=spec.modality, class_id=cid,
-            class_source=how, image=f"images/{safe}.png", mask=f"masks/{safe}.png",
-            height=h, width=w, src_image=str(i.relative_to(root)), src_mask=str(m.relative_to(root)),
-        ))
+        rows.append(
+            dict(
+                uid=safe,
+                dataset=spec.key,
+                modality=spec.modality,
+                class_id=cid,
+                class_source=how,
+                image=f"images/{safe}.png",
+                mask=f"masks/{safe}.png",
+                height=h,
+                width=w,
+                src_image=str(i.relative_to(root)),
+                src_mask=str(m.relative_to(root)),
+            )
+        )
 
     df = pd.DataFrame(rows)
     msg = f"  [ok  ] {spec.key}: {len(df)} 张 (丢弃 {n_bad}"

@@ -1,4 +1,5 @@
 """ROI 几何工具：letterbox、框裁剪、掩码贴回、mask<->轮廓。"""
+
 from __future__ import annotations
 
 import cv2
@@ -9,8 +10,13 @@ PAD_VALUE = 114
 
 
 # ---------------------------------------------------------------- letterbox
-def letterbox(img: np.ndarray, new_shape=(640, 640), color=PAD_VALUE,
-              auto: bool = False, scale_fill: bool = False):
+def letterbox(
+    img: np.ndarray,
+    new_shape=(640, 640),
+    color=PAD_VALUE,
+    auto: bool = False,
+    scale_fill: bool = False,
+):
     """缩放并填充到目标尺寸，保持宽高比。
 
     返回 (out, ratio, (dw, dh))，其中 ratio 为缩放比，(dw,dh) 为左右/上下总填充。
@@ -19,9 +25,6 @@ def letterbox(img: np.ndarray, new_shape=(640, 640), color=PAD_VALUE,
     h, w = img.shape[:2]
     nh, nw = new_shape
     r = min(nh / h, nw / w)
-    if not scale_fill and r != 1:
-        # auto=False 时强制拉伸到目标(等价于直接 resize);此处采用等比缩放+填充
-        pass
     new_unpad = (max(1, int(round(w * r))), max(1, int(round(h * r))))
     if (new_unpad[0] != w or new_unpad[1] != h) and not scale_fill:
         img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
@@ -33,8 +36,7 @@ def letterbox(img: np.ndarray, new_shape=(640, 640), color=PAD_VALUE,
 
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    img = cv2.copyMakeBorder(img, top, bottom, left, right,
-                             cv2.BORDER_CONSTANT, value=color)
+    img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
     return img, r, (left, top)
 
 
@@ -58,7 +60,7 @@ def unletterbox_mask(mask_lb: np.ndarray, orig_hw, ratio: float, pad) -> np.ndar
     h, w = orig_hw
     left, top = pad
     nh, nw = mask_lb.shape[:2]
-    m = mask_lb[top:nh - top, left:nw - left]
+    m = mask_lb[top : nh - top, left : nw - left]
     if m.size == 0:
         m = mask_lb
     out = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST)
@@ -98,13 +100,14 @@ def resize_roi(roi: np.ndarray, size: int, square_pad: bool = True) -> np.ndarra
         r = cv2.resize(roi, (nw, nh), interpolation=cv2.INTER_LINEAR)
         out = np.full((size, size, *roi.shape[2:]), PAD_VALUE, np.uint8)
         y0, x0 = (size - nh) // 2, (size - nw) // 2
-        out[y0:y0 + nh, x0:x0 + nw] = r
+        out[y0 : y0 + nh, x0 : x0 + nw] = r
         return out
     return cv2.resize(roi, (size, size), interpolation=cv2.INTER_LINEAR)
 
 
-def paste_roi_mask(roi_mask: np.ndarray, roi_hw, size: int, bbox_orig,
-                   orig_shape, square_pad: bool = True) -> np.ndarray:
+def paste_roi_mask(
+    roi_mask: np.ndarray, roi_hw, size: int, bbox_orig, orig_shape, square_pad: bool = True
+) -> np.ndarray:
     """把 size×size 的 ROI 掩码还原到原图坐标系的整图掩码。
 
     步骤：去填充 -> 反缩放到 roi_hw -> 平移贴到 bbox_orig 位置。
@@ -119,7 +122,7 @@ def paste_roi_mask(roi_mask: np.ndarray, roi_hw, size: int, bbox_orig,
         s = size / max(rh, rw)
         nw, nh = max(1, int(round(rw * s))), max(1, int(round(rh * s)))
         y0, x0 = (size - nh) // 2, (size - nw) // 2
-        m = m[y0:y0 + nh, x0:x0 + nw]
+        m = m[y0 : y0 + nh, x0 : x0 + nw]
     m = cv2.resize(m, (roi_hw[1], roi_hw[0]), interpolation=cv2.INTER_NEAREST)
     x1, y1, x2, y2 = bbox_orig
     rh, rw = roi_hw
@@ -129,7 +132,7 @@ def paste_roi_mask(roi_mask: np.ndarray, roi_hw, size: int, bbox_orig,
     ex2, ey2 = min(iw, ix1 + rw), min(ih, iy1 + rh)
     ex1, ey1 = max(0, ix1), max(0, iy1)
     if ex2 > ex1 and ey2 > ey1:
-        out[ey1:ey2, ex1:ex2] = m[ey1 - iy1:ey2 - iy1, ex1 - ix1:ex2 - ix1]
+        out[ey1:ey2, ex1:ex2] = m[ey1 - iy1 : ey2 - iy1, ex1 - ix1 : ex2 - ix1]
     return out
 
 

@@ -1,0 +1,57 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Contour_Maker: YOLO-Seg vs Det-UNet vs RF-DETR-Seg for instance segmentation"
+abstract: >-
+  A reproducible comparison of three instance-segmentation schemes (YOLO26n-seg,
+  YOLO26n-det + MK-UNet, and RF-DETR-Seg-Nano) on ultrasound lesion data and a
+  10-class ADE20K indoor-object subset. Training is done in PyTorch and
+  deployment in C++/MNN.
+authors:
+  - family-names: "Contour_Maker contributors"
+    given-names: ""
+version: 3.0.0
+date-released: 2026-11-04
+license: AGPL-3.0
+repository-code: "https://github.com/<your-name>/Contour_Maker"
+keywords:
+  - instance segmentation
+  - ultrasound
+  - YOLO
+  - RF-DETR
+  - MNN
+  - edge deployment
+  - embodied AI
+  - ADE20K
+references:
+  - type: software
+    title: "Ultralytics YOLO"
+    authors:
+      - name: "Ultralytics"
+    url: "https://github.com/ultralytics/ultralytics"
+  - type: software
+    title: "RF-DETR"
+    authors:
+      - name: "Roboflow"
+    url: "https://github.com/roboflow/rf-detr"
+  - type: software
+    title: "MNN"
+    authors:
+      - name: "Alibaba"
+    url: "https://github.com/alibaba/MNN"
+  - type: conference
+    title: "Scene Parsing through ADE20K Dataset"
+    authors:
+      - family-names: "Zhou"
+        given-names: "Bolei"
+      - family-names: "Zhao"
+        given-names: "Hang"
+      - family-names: "Puig"
+        given-names: "Xavier"
+      - family-names: "Fidler"
+        given-names: "Sanja"
+      - family-names: "Barriuso"
+        given-names: "Adela"
+      - family-names: "Torralba"
+        given-names: "Antonio"
+    year: 2017
+    collection-title: "CVPR"

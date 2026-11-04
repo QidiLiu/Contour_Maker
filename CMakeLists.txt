@@ -32,7 +32,7 @@ else()
 endif()
 
 # ---------------------------------------------------------------- options
-option(CM_BUILD_TESTS "构建 two-stage-test / one-stage-test" ON)
+option(CM_BUILD_TESTS "构建 det-unet-test / yolo-seg-test" ON)
 
 # ---------------------------------------------------------------- cxx-common
 # 两个 C++ 测试子项目共用的静态库：图像 IO、几何、MNN 封装。
@@ -42,6 +42,7 @@ add_library(cxxcommon STATIC
   cxx-common/src/metrics.cpp
   cxx-common/src/postprocess.cpp
   cxx-common/src/mnn_runner.cpp
+  cxx-common/src/eval_harness.cpp
 )
 target_include_directories(cxxcommon PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/cxx-common/include
@@ -61,8 +62,9 @@ target_link_libraries(cxxcommon PUBLIC MNN_Express MNN)
 
 # ---------------------------------------------------------------- subprojects
 if(CM_BUILD_TESTS)
-  add_subdirectory(one-stage-test)
-  add_subdirectory(two-stage-test)
+  add_subdirectory(yolo-seg-test)
+  add_subdirectory(det-unet-test)
+  add_subdirectory(rfdetr-seg-test)
 endif()
 
 message(STATUS "")

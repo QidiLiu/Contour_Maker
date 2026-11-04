@@ -2,11 +2,21 @@
 
 全部以像素为单位，在原图分辨率下计算。
 """
+
 from __future__ import annotations
 
 import cv2
 import numpy as np
 from scipy import ndimage
+
+# Mask <-> contour helpers live in common.roi; re-exported here so existing
+# ``from common.metrics import mask_to_contour`` imports keep working.
+from .roi import (  # noqa: F401  (re-exported for backwards compatibility)
+    bbox_iou,
+    contour_to_mask,
+    mask_bbox,
+    mask_to_contour,
+)
 
 
 # ---------------------------------------------------------------- 基础
@@ -98,56 +108,17 @@ def evaluate_pair(pred: np.ndarray, gt: np.ndarray, boundary_tol: float = 2.0) -
     p = (pred.astype(bool)).astype(np.uint8)
     g = (gt.astype(bool)).astype(np.uint8)
     return dict(
-        dice=dice(p, g), iou=iou(p, g),
-        hd95=hd95(p, g), assd=assd(p, g),
+        dice=dice(p, g),
+        iou=iou(p, g),
+        hd95=hd95(p, g),
+        assd=assd(p, g),
         bf1=boundary_f1(p, g, boundary_tol),
         area_err=area_error(p, g),
     )
 
 
-# ---------------------------------------------------------------- 掩码 <-> 轮廓
-def mask_to_contour(mask: np.ndarray) -> np.ndarray | None:
-    """二值 mask -> 最大外轮廓点集 (N,2) float32。"""
-    m = (mask > 0).astype(np.uint8)
-    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    if not cs:
-        return None
-    c = max(cs, key=cv2.contourArea)
-    if len(c) < 3 or cv2.contourArea(c) < 1:
-        return None
-    return c.reshape(-1, 2).astype(np.float32)
-
-
-def contour_to_mask(pts: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
-    """多边形填充为二值 mask (0/1 uint8)。"""
-    m = np.zeros(shape, np.uint8)
-    if pts is None or len(pts) < 3:
-        return m
-    cv2.fillPoly(m, [np.round(np.asarray(pts, np.float64)).astype(np.int32)], 1)
-    return m
-
-
-def mask_bbox(mask: np.ndarray):
-    ys, xs = np.nonzero(mask)
-    if xs.size == 0:
-        return None
-    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
-
-
-def bbox_iou(a, b) -> float:
-    if a is None or b is None:
-        return 0.0
-    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
-    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
-    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
-    inter = iw * ih
-    ua = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
-    return float(inter / ua) if ua > 0 else 0.0
-
-
 # ---------------------------------------------------------------- 匹配
-def greedy_match(pred_masks: list[np.ndarray], gt_masks: list[np.ndarray],
-                 thresh: float = 0.5):
+def greedy_match(pred_masks: list[np.ndarray], gt_masks: list[np.ndarray], thresh: float = 0.5):
     """按 mask IoU 贪心匹配（先匹配合适度最高的）。
 
     返回 (pairs, n_miss, n_fp)：
@@ -178,7 +149,6 @@ def greedy_match(pred_masks: list[np.ndarray], gt_masks: list[np.ndarray],
 
 def gt_components(mask: np.ndarray, min_area: int = 50):
     """GT mask -> 连通域列表，每项含 mask/bbox/contour。"""
-    from .metrics import contour_to_mask  # 自身引用保持显式
 
     m = (mask > 127).astype(np.uint8)
     n, labels, stats, _ = cv2.connectedComponentsWithStats(m, 8)
@@ -202,8 +172,9 @@ def prf(n_tp: int, n_fp: int, n_fn: int) -> dict:
     return dict(precision=p, recall=r, f1=f)
 
 
-def paired_bootstrap_ci(deltas: list[float], n_boot: int = 5000, seed: int = 42,
-                        alpha: float = 0.05):
+def paired_bootstrap_ci(
+    deltas: list[float], n_boot: int = 5000, seed: int = 42, alpha: float = 0.05
+):
     """按样本配对 bootstrap：返回 (观测均值, CI下界, CI上界, 双侧p值)。
 
     deltas 必须已按同一单位(图像或目标)配对，长度一致。
