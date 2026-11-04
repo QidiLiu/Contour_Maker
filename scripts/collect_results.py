@@ -27,7 +27,7 @@ def _flatten(path: Path) -> dict | None:
     parts = run.split("_")
     runtime = parts[-1] if parts[-1] in {"py", "cxx"} else "?"
     dataset = parts[0] if parts[0] in {"ultrasound", "ade20k"} else "?"
-    rest = run[len(dataset) + 1:] if dataset != "?" else run
+    rest = run[len(dataset) + 1 :] if dataset != "?" else run
     scheme = rest[: -(len(runtime) + 1)] if runtime != "?" else rest
     seg = data.get("segmentation", {}) or {}
     det = data.get("detection", {}) or {}
@@ -85,6 +85,7 @@ def main() -> int:
     df.to_csv(out / "summary.csv", index=False)
 
     cols = [
+        "dataset",
         "scheme",
         "runtime",
         "n_images",

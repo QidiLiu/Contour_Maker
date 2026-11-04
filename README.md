@@ -99,13 +99,15 @@ DETR 式查询，无 NMS、无 anchor；参数量 33.5M。MNN 转换后可跑 C+
 
 | 指标 | YOLO-Seg | Det-UNet | RF-DETR-Seg |
 |---|---|---|---|
-| P / R / F1 | 0.608 / 0.311 / 0.412 | 0.536 / 0.268 / 0.357 | TBD |
-| Dice / IoU | 0.851 / 0.748 | 0.851 / 0.749 | TBD |
-| 边界 F1 | 0.457 | 0.503 | TBD |
-| cls_acc | 0.939 | 0.947 | TBD |
-| 端到端 (ms) | 45.8 | 97.9 | TBD |
+| P / R / F1 | 0.608 / 0.311 / 0.412 | 0.536 / 0.268 / 0.357 | **0.482 / 0.687 / 0.566** |
+| Dice / IoU | 0.851 / 0.748 | 0.851 / 0.749 | **0.890 / 0.810** |
+| 边界 F1 | 0.457 | 0.503 | **0.719** |
+| cls_acc | 0.939 | 0.947 | **0.948** |
+| 端到端 (ms) | **45.8** | 97.9 | 407.6 |
 
-> 结果汇总文件：[`results/summary.csv`](results/summary.csv) / [`results/summary.md`](results/summary.md)（运行后生成）。
+> **结论**：ADE20K 上 RF-DETR-Seg 的检测 F1 与分割几何最好，但 CPU 推理慢 9 倍；
+> YOLO-Seg 最快且精度居中；Det-UNet 受检测器召回限制，F1 最低。
+> 结果文件：[`results/summary.csv`](results/summary.csv) / [`results/summary.md`](results/summary.md)。
 
 ---
 
