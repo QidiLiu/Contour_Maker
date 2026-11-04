@@ -123,6 +123,8 @@ do_validate() {
 
 # ---------------------------------------------------------------- export
 do_export() {
+  do_mnnconvert
+
   say "Export ONNX (YOLO-Seg)"
   cd "$ROOT/yolo-seg-train"
   "$PY" export_onnx.py --seg "$ROOT/runs/$SEG_RUN/weights/best.pt" \
@@ -143,7 +145,6 @@ do_export() {
   cd "$ROOT"
 
   say "ONNX -> MNN (YOLO / MK-UNet)"
-  do_mnnconvert
   "$MNN_CONVERT" -f ONNX --modelFile "$ROOT/models/yolo26n_seg.onnx" \
       --MNNModel "$ROOT/models/yolo26n_seg.mnn"
   "$MNN_CONVERT" -f ONNX --modelFile "$ROOT/models/yolo26n_det.onnx" \
