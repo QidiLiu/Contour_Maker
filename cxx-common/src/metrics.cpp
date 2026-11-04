@@ -9,44 +9,69 @@
 namespace cxxcommon {
 namespace {
 
-// 4-邻接欧氏距离变换（两遍 chamfer，与 scipy 的 EDT 有亚像素级差异，
-// 对 HD95/ASSD 的影响远小于模型本身的推理差异）
-std::vector<float> DistanceTransform(const std::vector<uint8_t>& mask, int w, int h) {
-  const float kInf = 1e9f;
-  std::vector<float> d(static_cast<size_t>(w) * h, kInf);
-  for (size_t i = 0; i < mask.size(); ++i) {
-    if (mask[i]) d[i] = 0.f;
-  }
-  // forward pass
-  for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-      const size_t i = static_cast<size_t>(y) * w + x;
-      if (d[i] == 0.f) continue;
-      float best = kInf;
-      if (y > 0) best = std::min(best, d[i - w]);
-      if (x > 0) best = std::min(best, d[i - 1]);
-      if (y > 0 && x > 0) best = std::min(best, d[i - w - 1]);
-      if (y > 0 && x + 1 < w) best = std::min(best, d[i - w + 1]);
-      if (best < kInf) d[i] = std::sqrt(best * best + 1.f);
+// 精确欧氏距离变换（Felzenszwalb & Huttenlocher 1D 下包络），
+// 与 scipy.ndimage.distance_transform_edt 的口径一致。
+namespace {
+
+void Edt1D(const float* f, int n, float* d) {
+  const float kInf = 1e20f;
+  std::vector<int> v(static_cast<size_t>(n));
+  std::vector<float> z(static_cast<size_t>(n) + 1);
+  int k = 0;
+  v[0] = 0;
+  z[0] = -kInf;
+  z[1] = kInf;
+  for (int q = 1; q < n; ++q) {
+    float s = ((f[q] + static_cast<float>(q) * q) -
+               (f[v[k]] + static_cast<float>(v[k]) * v[k])) /
+              static_cast<float>(2 * q - 2 * v[k]);
+    while (s <= z[k]) {
+      --k;
+      s = ((f[q] + static_cast<float>(q) * q) -
+           (f[v[k]] + static_cast<float>(v[k]) * v[k])) /
+          static_cast<float>(2 * q - 2 * v[k]);
     }
+    ++k;
+    v[k] = q;
+    z[k] = s;
+    z[k + 1] = kInf;
   }
-  // backward pass
-  for (int y = h - 1; y >= 0; --y) {
-    for (int x = w - 1; x >= 0; --x) {
-      const size_t i = static_cast<size_t>(y) * w + x;
-      if (d[i] == 0.f) continue;
-      float best = kInf;
-      if (y + 1 < h) best = std::min(best, d[i + w]);
-      if (x + 1 < w) best = std::min(best, d[i + 1]);
-      if (y + 1 < h && x + 1 < w) best = std::min(best, d[i + w + 1]);
-      if (y + 1 < h && x > 0) best = std::min(best, d[i + w - 1]);
-      if (best < kInf) d[i] = std::min(d[i], std::sqrt(best * best + 1.f));
-    }
+  k = 0;
+  for (int q = 0; q < n; ++q) {
+    while (z[k + 1] < static_cast<float>(q)) ++k;
+    const float dq = static_cast<float>(q - v[k]);
+    d[q] = dq * dq + f[v[k]];
   }
-  return d;
 }
 
-// 边界像素（4-邻域 erosion 的补）
+}  // namespace
+
+std::vector<float> DistanceTransform(const std::vector<uint8_t>& mask, int w, int h) {
+  const float kInf = 1e20f;
+  const size_t n = static_cast<size_t>(w) * h;
+  std::vector<float> grid(n, kInf);
+  for (size_t i = 0; i < n; ++i) {
+    if (mask[i]) grid[i] = 0.f;
+  }
+  std::vector<float> line(static_cast<size_t>(std::max(w, h)));
+  std::vector<float> out(static_cast<size_t>(std::max(w, h)));
+  // rows
+  for (int y = 0; y < h; ++y) {
+    Edt1D(grid.data() + static_cast<size_t>(y) * w, w, line.data());
+    std::copy(line.begin(), line.begin() + w, grid.begin() + static_cast<size_t>(y) * w);
+  }
+  // columns
+  for (int x = 0; x < w; ++x) {
+    for (int y = 0; y < h; ++y) line[y] = grid[static_cast<size_t>(y) * w + x];
+    Edt1D(line.data(), h, out.data());
+    for (int y = 0; y < h; ++y) grid[static_cast<size_t>(y) * w + x] = out[y];
+  }
+  for (size_t i = 0; i < n; ++i) grid[i] = std::sqrt(grid[i]);
+  return grid;
+}
+
+// 边界像素：8-邻域 erosion 的补，与 Python
+// ndimage.binary_erosion(structure=ones(3,3), border_value=0) 对齐。
 std::vector<uint8_t> SurfaceMask(const std::vector<uint8_t>& mask, int w, int h) {
   std::vector<uint8_t> out(mask.size(), 0);
   for (int y = 0; y < h; ++y) {
@@ -54,10 +79,15 @@ std::vector<uint8_t> SurfaceMask(const std::vector<uint8_t>& mask, int w, int h)
       const size_t i = static_cast<size_t>(y) * w + x;
       if (!mask[i]) continue;
       bool border = false;
-      if (x == 0 || y == 0 || x == w - 1 || y == h - 1) {
-        border = true;
-      } else {
-        border = !mask[i - 1] || !mask[i + 1] || !mask[i - w] || !mask[i + w];
+      for (int dy = -1; dy <= 1 && !border; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+          if (!dx && !dy) continue;
+          const int ny = y + dy, nx = x + dx;
+          if (ny < 0 || ny >= h || nx < 0 || nx >= w || !mask[static_cast<size_t>(ny) * w + nx]) {
+            border = true;
+            break;
+          }
+        }
       }
       if (border) out[i] = 1;
     }

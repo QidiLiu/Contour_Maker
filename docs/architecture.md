@@ -117,7 +117,7 @@ rfdetr-seg-test/        RF-DETR-Seg C++/MNN 推理
 cxx-common/             C++ 共享库：图像 IO/几何/指标/MNN 封装/评估
 scripts/                一键脚本与结果汇总
 docs/                   数据集、架构、部署、复现、基准文档
-models/                 入库的 .mnn（超声三方案）
+models/                 入库的 YOLO/MK-UNet .mnn；RF-DETR .mnn 由脚本生成
 weights/                训练起点（YOLO 基座）
 results/                可复现的汇总结果（CSV/Markdown）
 ```

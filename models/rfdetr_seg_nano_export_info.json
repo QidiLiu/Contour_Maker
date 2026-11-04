@@ -1,0 +1,21 @@
+{
+  "scheme": "rfdetr-seg",
+  "dataset": "ultrasound",
+  "variant": "RFDETRSegNano",
+  "resolution": 384,
+  "opset": 17,
+  "classes": [
+    "breast_benign",
+    "breast_malignant",
+    "thyroid_nodule",
+    "thyroid_gland"
+  ],
+  "num_classes": 4,
+  "weights": "runs/rfdetr_seg_ultrasound/checkpoint_best_total.pth",
+  "outputs": [
+    "dets (1,Q,4)",
+    "labels (1,Q,C+1)",
+    "masks (1,Q,R/4,R/4)"
+  ],
+  "mnn": "models/rfdetr_seg_nano.mnn"
+}

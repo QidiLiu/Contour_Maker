@@ -11,7 +11,7 @@ namespace {
 
 void PrintUsage() {
   printf(
-      "det-unet-test —— 两阶段推理: YOLO26n(det) + MK-UNet (MNN)\n"
+      "det-unet-test —— Det-UNet 推理: YOLO26n(det) + MK-UNet (MNN)\n"
       "\n"
       "用法:\n"
       "  det_unet_test --det <yolo26n_det.mnn> --mkunet <mkunet.mnn> \\\n"

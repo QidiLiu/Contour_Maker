@@ -263,6 +263,11 @@ def build(seed: int = ADE20K_SPLIT_SEED) -> None:
     ADE20K_SPLITS.mkdir(parents=True, exist_ok=True)
     df.to_csv(ADE20K_UNIFIED / "manifest.csv", index=False)
     df.to_csv(ADE20K_SPLITS / "splits.csv", index=False)
+    for split in ("train", "val", "test"):
+        paths = [(ADE20K_UNIFIED / img).resolve() for img in df.loc[df["split"] == split, "image"]]
+        (ADE20K_SPLITS / f"{split}.txt").write_text(
+            "\n".join(str(p) for p in paths) + "\n", encoding="utf-8"
+        )
     (ADE20K_SPLITS / "splits_meta.json").write_text(
         json.dumps(
             dict(

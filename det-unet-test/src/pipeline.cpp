@@ -1,4 +1,4 @@
-// 两阶段流水线实现。
+// Det-UNet 流水线实现。
 #include "pipeline.hpp"
 
 #include <algorithm>

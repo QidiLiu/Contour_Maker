@@ -161,17 +161,30 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMNN_OPENCL=ON
 cmake --build build -j
 
 ./build/yolo-seg-test/yolo_seg_test --model models/yolo26n_seg.mnn \
-    --image-dir data/unified/images --gt-dir data/unified/masks \
+    --list-file data/splits/test.txt --gt-dir data/unified/masks \
     --out-dir reports/ultrasound_yolo_seg_cxx
 ./build/det-unet-test/det_unet_test --det models/yolo26n_det.mnn \
-    --mkunet models/mkunet.mnn --image-dir data/unified/images \
+    --mkunet models/mkunet.mnn --list-file data/splits/test.txt \
     --gt-dir data/unified/masks --out-dir reports/ultrasound_det_unet_cxx
 ./build/rfdetr-seg-test/rfdetr_seg_test --model models/rfdetr_seg_nano.mnn \
-    --image-dir data/unified/images --gt-dir data/unified/masks \
+    --list-file data/splits/test.txt --gt-dir data/unified/masks \
     --resolution 384 --out-dir reports/ultrasound_rfdetr_seg_cxx
 ```
 
-## 6. 汇总结果
+## 6. 一键对比
+
+```bash
+# 全量 test（1256 张超声 / 800 张 ADE20K）
+./scripts/run_benchmarks.sh ultrasound
+./scripts/run_benchmarks.sh ade20k
+
+# 快速子集（只跑前 120 张）
+MAX_IMAGES=120 ./scripts/run_benchmarks.sh ultrasound
+```
+
+脚本会依次跑三个方案的 Python 与 C++/MNN 推理，并在 `results/` 汇总。
+
+## 7. 汇总结果
 
 ```bash
 $PY scripts/collect_results.py --reports reports --out results

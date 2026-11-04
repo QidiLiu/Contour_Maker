@@ -10,7 +10,7 @@ namespace {
 
 void PrintUsage() {
   printf(
-      "yolo-seg-test —— 单阶段 YOLO26n-seg 端到端推理 (MNN)\n"
+      "yolo-seg-test —— YOLO-Seg YOLO26n-seg 端到端推理 (MNN)\n"
       "\n"
       "用法:\n"
       "  yolo-seg_test --model <yolo26n_seg.mnn> --image-dir <dir> [选项]\n"

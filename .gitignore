@@ -33,7 +33,9 @@ logs/
 # deployed ultrasound .mnn files (deliverables)
 !weights/yolo26n.pt
 !weights/yolo26n-seg.pt
-!models/*.mnn
+!models/yolo26n_seg.mnn
+!models/yolo26n_det.mnn
+!models/mkunet.mnn
 
 # ---------------------------------------------------------------- C++ build
 build/

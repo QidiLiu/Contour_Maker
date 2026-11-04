@@ -235,10 +235,11 @@ MKUNET_LR = 1e-3
 MKUNET_WEIGHT_DECAY = 1e-4
 
 # ---------------------------------------------------------------- RF-DETR
-# Nano is the only variant used in the benchmark.  504 is the nearest multiple
-# of patch_size * num_windows (12) to the 512 used by the YOLO schemes.
+# Nano is the only variant used in the benchmark.  The input side must be a
+# multiple of patch_size * num_windows (12); 384 is the compromise used here to
+# keep single-GPU training time reasonable (504 is the nearest to YOLO's 512).
 RFDETR_VARIANT = "RFDETRSegNano"
-RFDETR_RESOLUTION = 504
+RFDETR_RESOLUTION = 384
 RFDETR_EPOCHS = 40
 RFDETR_BATCH = 4
 RFDETR_GRAD_ACCUM = 4

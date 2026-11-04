@@ -17,6 +17,7 @@ MAX_IMAGES="${MAX_IMAGES:-0}"
 if [[ "$DATASET" == "ade20k" ]]; then
   UNIFIED="$ROOT/data/ade20k/unified"
   SPLITS="$ROOT/data/ade20k/splits/splits.csv"
+  TEST_LIST="$ROOT/data/ade20k/splits/test.txt"
   INSTANCES="$ROOT/data/ade20k/unified/instances"
   NC=10
   SEG_W="$ROOT/runs/yolo_seg_ade20k/weights/best.pt"
@@ -32,6 +33,7 @@ if [[ "$DATASET" == "ade20k" ]]; then
 else
   UNIFIED="$ROOT/data/unified"
   SPLITS="$ROOT/data/splits/splits.csv"
+  TEST_LIST="$ROOT/data/splits/test.txt"
   NC=4
   SEG_W="$ROOT/runs/seg_yolo26n/weights/best.pt"
   DET_W="$ROOT/runs/det_yolo26n/weights/best.pt"
@@ -71,19 +73,19 @@ cd "$ROOT/rfdetr-seg-train"
 
 say "C++: YOLO-Seg"
 "$ROOT/build/yolo-seg-test/yolo_seg_test" \
-  --model "$SEG_M" --image-dir "$UNIFIED/images" --gt-dir "$UNIFIED/masks" \
+  --model "$SEG_M" --list-file "$TEST_LIST" --gt-dir "$UNIFIED/masks" \
   "${EXTRA_CXX[@]}" --imgsz 512 --num-classes "$NC" "${MAX_CXX[@]}" \
   --out-dir "$ROOT/reports/${DATASET}_yolo_seg_cxx"
 
 say "C++: Det-UNet"
 "$ROOT/build/det-unet-test/det_unet_test" \
-  --det "$DET_M" --mkunet "$MK_M" --image-dir "$UNIFIED/images" --gt-dir "$UNIFIED/masks" \
+  --det "$DET_M" --mkunet "$MK_M" --list-file "$TEST_LIST" --gt-dir "$UNIFIED/masks" \
   "${EXTRA_CXX[@]}" --det-imgsz 512 --roi-size 256 --num-classes "$NC" "${MAX_CXX[@]}" \
   --out-dir "$ROOT/reports/${DATASET}_det_unet_cxx"
 
 say "C++: RF-DETR-Seg"
 "$ROOT/build/rfdetr-seg-test/rfdetr_seg_test" \
-  --model "$RF_M" --image-dir "$UNIFIED/images" --gt-dir "$UNIFIED/masks" \
+  --model "$RF_M" --list-file "$TEST_LIST" --gt-dir "$UNIFIED/masks" \
   "${EXTRA_CXX[@]}" --resolution 384 --num-classes "$NC" "${MAX_CXX[@]}" \
   --out-dir "$ROOT/reports/${DATASET}_rfdetr_seg_cxx"
 

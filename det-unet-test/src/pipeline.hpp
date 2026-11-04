@@ -1,4 +1,4 @@
-// 两阶段流水线：YOLO26n(det) → ROI → MK-UNet → 带类别的目标轮廓。
+// Det-UNet 流水线：YOLO26n(det) → ROI → MK-UNet → 带类别的目标轮廓。
 #pragma once
 
 #include <map>

@@ -24,12 +24,27 @@ def test_coco_export_instance_classes(tmp_path):
     cv2.imwrite(str(unified / "masks" / f"{uid}.png"), idmap)
     write_sidecar(inst / f"{uid}.csv", {1: 3, 2: 7})
 
-    df = pd.DataFrame([dict(uid=uid, image=f"images/{uid}.png", mask=f"masks/{uid}.png",
-                            class_id=3, dataset="demo", split="train")])
+    df = pd.DataFrame(
+        [
+            dict(
+                uid=uid,
+                image=f"images/{uid}.png",
+                mask=f"masks/{uid}.png",
+                class_id=3,
+                dataset="demo",
+                split="train",
+            )
+        ]
+    )
     out = tmp_path / "coco"
-    r = export_split(df, "train", out, unified=unified,
-                     class_names=["a", "b", "c", "d", "e", "f", "g", "h"],
-                     gt_instances_dir=inst)
+    r = export_split(
+        df,
+        "train",
+        out,
+        unified=unified,
+        class_names=["a", "b", "c", "d", "e", "f", "g", "h"],
+        gt_instances_dir=inst,
+    )
     assert r["images"] == 1 and r["annotations"] == 2
     data = json.loads((out / "train" / "_annotations.coco.json").read_text())
     assert {a["category_id"] for a in data["annotations"]} == {3, 7}

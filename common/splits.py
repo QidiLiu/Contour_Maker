@@ -128,6 +128,7 @@ def main() -> int:
     ap.add_argument("--verify", type=str, default=None, help="old splits.csv path")
     ap.add_argument("--manifest", default=None, help="manifest.csv path")
     ap.add_argument("--out", default=None, help="output splits.csv path")
+    ap.add_argument("--unified", default=None, help="unified image root for the .txt lists")
     ap.add_argument("--classes", default=None, help="comma-separated class names")
     args = ap.parse_args()
 
@@ -150,6 +151,12 @@ def main() -> int:
     out = Path(args.out) if args.out else SPLITS / "splits.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
+    unified = Path(args.unified) if args.unified else UNIFIED
+    for split in ("train", "val", "test"):
+        paths = [(unified / img).resolve() for img in df.loc[df["split"] == split, "image"]]
+        (out.parent / f"{split}.txt").write_text(
+            "\n".join(str(p) for p in paths) + "\n", encoding="utf-8"
+        )
     _report(df, class_names)
 
     (out.parent / "splits_meta.json").write_text(

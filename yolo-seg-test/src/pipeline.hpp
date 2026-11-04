@@ -1,4 +1,4 @@
-// 单阶段流水线：YOLO26n-seg 端到端推理。
+// YOLO-Seg 流水线：YOLO26n-seg 端到端推理。
 #pragma once
 
 #include <map>

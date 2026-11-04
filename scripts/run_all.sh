@@ -177,7 +177,7 @@ do_test() {
   say "C++ test (YOLO-Seg)"
   "$ROOT/build/yolo-seg-test/yolo_seg_test" \
       --model "$ROOT/models/yolo26n_seg.mnn" \
-      --image-dir "$ROOT/data/unified/images" \
+      --list-file "$ROOT/data/splits/test.txt" \
       --gt-dir "$ROOT/data/unified/masks" \
       --imgsz 512 --conf 0.25 --num-classes 4 \
       --out-dir "$ROOT/reports/ultrasound_yolo_seg_cxx"
@@ -186,7 +186,7 @@ do_test() {
   "$ROOT/build/det-unet-test/det_unet_test" \
       --det "$ROOT/models/yolo26n_det.mnn" \
       --mkunet "$ROOT/models/mkunet.mnn" \
-      --image-dir "$ROOT/data/unified/images" \
+      --list-file "$ROOT/data/splits/test.txt" \
       --gt-dir "$ROOT/data/unified/masks" \
       --det-imgsz 512 --roi-size 256 --pad-ratio 0.15 \
       --out-dir "$ROOT/reports/ultrasound_det_unet_cxx"
@@ -194,7 +194,7 @@ do_test() {
   say "C++ test (RF-DETR-Seg)"
   "$ROOT/build/rfdetr-seg-test/rfdetr_seg_test" \
       --model "$ROOT/models/rfdetr_seg_nano.mnn" \
-      --image-dir "$ROOT/data/unified/images" \
+      --list-file "$ROOT/data/splits/test.txt" \
       --gt-dir "$ROOT/data/unified/masks" \
       --resolution "${RFDETR_RESOLUTION:-384}" --conf 0.25 --num-classes 4 \
       --out-dir "$ROOT/reports/ultrasound_rfdetr_seg_cxx"

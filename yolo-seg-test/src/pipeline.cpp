@@ -1,4 +1,4 @@
-// 单阶段流水线实现：YOLO26n-seg 端到端推理。
+// YOLO-Seg 流水线实现：YOLO26n-seg 端到端推理。
 #include "pipeline.hpp"
 
 #include <algorithm>

@@ -76,22 +76,26 @@ DETR 式查询，无 NMS、无 anchor；参数量 33.5M。MNN 转换后可跑 C+
 > 完整协议、硬件与逐步命令见 [`docs/benchmarks.md`](docs/benchmarks.md)。
 > 所有速度均为 **C++/MNN、CPU 后端、顺序单图推理**（含预处理/后处理）。
 
-### 超声测试集（4 类，120 张子集）
+### 超声测试集（4 类，1256 张 test，C++/MNN CPU）
 
 | 指标 | YOLO-Seg | Det-UNet | RF-DETR-Seg |
 |---|---|---|---|
-| Precision | **0.8393** | 0.7642 | TBD |
-| Recall | 0.7833 | 0.7833 | TBD |
-| F1 | **0.8103** | 0.7737 | TBD |
-| Dice | 0.8791 | **0.8877** | TBD |
-| IoU | 0.7882 | **0.8031** | TBD |
-| HD95 (px) | 3.87 | **3.86** | TBD |
-| ASSD (px) | 2.06 | **2.04** | TBD |
-| 边界 F1 | 0.6051 | **0.6438** | TBD |
-| 端到端 (ms) | **37.3** | 47.4 | TBD |
-| FPS | **26.8** | 21.1 | TBD |
+| Precision | **0.8994** | 0.8818 | 0.7679 |
+| Recall | 0.8967 | 0.8877 | **0.9289** |
+| F1 | **0.8981** | 0.8847 | 0.8408 |
+| Dice | 0.9061 | 0.8889 | **0.9243** |
+| IoU | 0.8326 | 0.8050 | **0.8630** |
+| HD95 (px) | 9.51 | 11.34 | **7.86** |
+| ASSD (px) | 3.19 | 3.94 | **2.61** |
+| 边界 F1 | 0.5843 | 0.5021 | **0.6630** |
+| 端到端 (ms) | **50.4** | 65.6 | 518.2 |
+| FPS | **19.8** | 15.2 | 1.9 |
 
-### ADE20K-10（10 类室内物体，800 张 test）
+> 三方案同 test 集、同一 mask IoU 0.5 匹配。RF-DETR 的分割几何最好、召回最高，
+> 但在 MNN CPU 上明显更慢；Python/PyTorch 侧的交叉校验与分阶段耗时见
+> [`docs/benchmarks.md`](docs/benchmarks.md#4-超声结果)。
+
+### ADE20K-10（10 类室内物体，800 张 test，C++/MNN CPU）
 
 | 指标 | YOLO-Seg | Det-UNet | RF-DETR-Seg |
 |---|---|---|---|
@@ -130,7 +134,7 @@ cd yolo-seg-train && ../.venv/bin/python export_onnx.py --seg ../runs/seg_yolo26
 build/mnn-conv/MNNConvert -f ONNX --modelFile models/yolo26n_seg.onnx --MNNModel models/yolo26n_seg.mnn
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMNN_OPENCL=ON && cmake --build build -j
 ./build/yolo-seg-test/yolo_seg_test --model models/yolo26n_seg.mnn \
-    --image-dir data/unified/images --gt-dir data/unified/masks
+    --list-file data/splits/test.txt --gt-dir data/unified/masks
 ```
 
 C++ 依赖、MNN/MNNConvert 构建见 [`docs/deployment.md`](docs/deployment.md)；
@@ -172,6 +176,7 @@ C++ 依赖、MNN/MNNConvert 构建见 [`docs/deployment.md`](docs/deployment.md)
 ```bash
 # 数据 → 训练 → 验证 → 导出 → MNN → C++ → 汇总
 ./scripts/run_all.sh all
+./scripts/run_benchmarks.sh ultrasound   # Python + C++ 三方案对比
 .venv/bin/python scripts/collect_results.py --reports reports --out results
 ```
 

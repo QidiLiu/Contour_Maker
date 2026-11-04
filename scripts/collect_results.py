@@ -30,6 +30,11 @@ def _flatten(path: Path) -> dict | None:
     seg = data.get("segmentation", {}) or {}
     det = data.get("detection", {}) or {}
     speed = data.get("speed", {}) or {}
+    # Skip legacy summaries whose metrics were DataFrame.to_dict() dumps.
+    if not isinstance(seg.get("dice", 0), (int, float)):
+        return None
+    if data.get("n_images", 0) == 0 and not det.get("gt"):
+        return None
     if det.get("precision") is None and "tp" in det:
         tp, fp, fn = int(det.get("tp", 0)), int(det.get("fp", 0)), int(det.get("fn", 0))
         precision = tp / (tp + fp) if (tp + fp) else 0.0

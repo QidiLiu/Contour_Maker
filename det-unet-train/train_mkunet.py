@@ -1,4 +1,4 @@
-"""训练 MK-UNet（两阶段的第二级）。
+"""训练 MK-UNet（Det-UNet 第二级）。
 
 输入是 YOLO26n 检测框裁剪出的 ROI（已 resize 到 --roi-size），
 输出是该 ROI 内的前景/背景二值掩码。

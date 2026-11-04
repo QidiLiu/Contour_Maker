@@ -78,6 +78,8 @@ $MC -f ONNX --modelFile models/rfdetr_seg_nano.onnx --MNNModel models/rfdetr_seg
 ```
 
 也可以直接让 `rfdetr-seg-train/export_onnx.py` 顺带完成转换（检测到 `MNNConvert` 时自动执行）。
+RF-DETR 的 `.mnn` 约 118 MB，超过 GitHub 单文件 100 MB 限制，因此**不入库**；
+仓库只提供生成脚本。
 
 ## 4. 构建 C++
 
@@ -136,6 +138,8 @@ ADE20K（`--gt-instances` 启用逐实例类别）：
 ```
 
 所有可执行文件都支持 `--single <image>` 单图调试、`--max-images` 限制、`--quiet` 关闭进度。
+**做 benchmark 时请用 `--list-file data/splits/test.txt`**（ADE20K 用
+`data/ade20k/splits/test.txt`），否则 `--image-dir` 会遍历 train/val/test 全部图像。
 `--out-dir` 下会写 `per_image.csv` 与 `summary.json`。
 
 ## 6. OpenCL 说明
