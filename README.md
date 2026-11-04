@@ -99,11 +99,11 @@ DETR 式查询，无 NMS、无 anchor；参数量 33.5M。MNN 转换后可跑 C+
 
 | 指标 | YOLO-Seg | Det-UNet | RF-DETR-Seg |
 |---|---|---|---|
-| P / R / F1 | TBD | TBD | TBD |
-| Dice / IoU | TBD | TBD | TBD |
-| 边界 F1 | TBD | TBD | TBD |
-| cls_acc | TBD | TBD | TBD |
-| 端到端 (ms) | TBD | TBD | TBD |
+| P / R / F1 | 0.608 / 0.311 / 0.412 | 0.536 / 0.268 / 0.357 | TBD |
+| Dice / IoU | 0.851 / 0.748 | 0.851 / 0.749 | TBD |
+| 边界 F1 | 0.457 | 0.503 | TBD |
+| cls_acc | 0.939 | 0.947 | TBD |
+| 端到端 (ms) | 45.8 | 97.9 | TBD |
 
 > 结果汇总文件：[`results/summary.csv`](results/summary.csv) / [`results/summary.md`](results/summary.md)（运行后生成）。
 
@@ -201,7 +201,12 @@ C++ 依赖、MNN/MNNConvert 构建见 [`docs/deployment.md`](docs/deployment.md)
 - **RF-DETR 分辨率**：Nano 输入边长须为 12 的倍数；为控制单卡训练时间，默认用 384²，
   而 YOLO 方案为 512²。速度对比需结合分辨率解读。
 - **ADE20K 使用灰度**：为与嵌入式单通道管线一致，彩色图统一转灰度，精度低于彩色训练。
-- **ADE20K 为子集**：4000/600/800 的确定性采样，不代表完整 ADE20K 榜单。
+- **ADE20K 为子集**：4000/600/800 的确定性采样，不代表完整 ADE20K 榜单；
+  15 epoch 下检测召回仍是主要瓶颈（小目标多、10 类），但匹配目标的 Dice 仍可达 0.85+。
+- **RF-DETR 的 MNN CPU 推理很慢**（384² 约 518 ms/图，1.9 FPS）：Transformer + 100 query
+  掩码上采样的代价；YOLO-Seg 在 CPU 上约 44 ms/图，Det-UNet 约 66 ms/图。
+- **C++ 与 Python 的 ADE20K 检测指标差异较大**（多类 NMS/掩码上采样实现不同）；
+  横向对比请使用同一 runtime 的数字。
 - **Det-UNet 的 val_dice 偏乐观**：MK-UNet 验证集用 GT 框、训练集用检测框；
   真实指标以 test 端到端为准。
 - **MNN 版本锁定 3.4.0**：更新的 MNN 公开头文件已变动，升级需重新验证。

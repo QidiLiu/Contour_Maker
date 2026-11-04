@@ -107,7 +107,7 @@ RF-DETR 的 Nano 输入边长必须是 12 的倍数。默认 384² 是在单卡 
 | 方案 | P | R | F1 | Dice | IoU | HD95 | BF1 | cls_acc | ms/图 |
 |---|---|---|---|---|---|---|---|---|---|
 | YOLO-Seg | 0.6078 | 0.3114 | 0.4118 | 0.8508 | 0.7480 | 18.49 | 0.4571 | 0.9387 | 45.8 |
-| Det-UNet | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Det-UNet | 0.5356 | 0.2678 | 0.3565 | 0.8508 | 0.7492 | 24.00 | 0.5026 | 0.9469 | 97.9 |
 | RF-DETR-Seg | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ### 5.2 Python/PyTorch（同一 test，GPU）
@@ -115,7 +115,7 @@ RF-DETR 的 Nano 输入边长必须是 12 的倍数。默认 384² 是在单卡 
 | 方案 | P | R | F1 | Dice | IoU | HD95 | BF1 | cls_acc | ms/图 |
 |---|---|---|---|---|---|---|---|---|---|
 | YOLO-Seg | 0.5275 | 0.3995 | 0.4546 | 0.8822 | 0.7970 | 17.77 | 0.6208 | 0.9272 | 28.4 |
-| Det-UNet | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Det-UNet | 0.4595 | 0.3528 | 0.3991 | 0.8440 | 0.7384 | 23.78 | 0.4966 | 0.9312 | 53.0 |
 | RF-DETR-Seg | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
 > YOLO-Seg 的 Python 与 C++ 在 ADE20K 上的差异比超声大：C++ 的 NMS/掩码组合
